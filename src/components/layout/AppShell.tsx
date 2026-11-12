@@ -64,11 +64,7 @@ function AppSidebar({ collapsed,toggle,mobile,close }: { collapsed: boolean; tog
         </Link>
       })}
     </nav>
-    <div className="sidebar-note">
-      <BrandMark />
-      <p>Grandes ideas.<br /><strong>Nuevos comienzos.</strong></p>
-      <span>APRENDE. CREA. CONECTA.</span>
-    </div>
+
     <div className="sidebar-bottom">
       <Link href="/app/profile" onClick={close} className={'nav-link '+(location==='/app/profile'? 'active':'')} data-tip="Mi perfil">
         <Icon name="user" size={19} />
