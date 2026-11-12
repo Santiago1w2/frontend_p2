@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Aurion LMS: frontend React y Vite en Amplify Hosting desde GitHub."
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Repositorio del frontend"
+        Parameters:
+          - "AppName"
+          - "RepositoryUrl"
+          - "BranchName"
+          - "GitHubAccessToken"
+      - Label:
+          default: "Variables de entorno: URLs de los cinco microservicios"
+        Parameters:
+          - "ViteApiV1User"
+          - "ViteApiV1Course"
+          - "ViteApiV1Matriculas"
+          - "ViteApiV1Contenidos"
+          - "ViteApiV1Evaluaciones"
+    ParameterLabels:
+      AppName:
+        default: "Nombre de la aplicacion en Amplify"
+      RepositoryUrl:
+        default: "Link del repositorio GitHub del frontend"
+      BranchName:
+        default: "Rama a publicar (main, master, dev)"
+      GitHubAccessToken:
+        default: "Token personal de GitHub (oculto)"
+      ViteApiV1User:
+        default: "VITE_API_V1_USER"
+      ViteApiV1Course:
+        default: "VITE_API_V1_COURSE"
+      ViteApiV1Matriculas:
+        default: "VITE_API_V1_MATRICULAS"
+      ViteApiV1Contenidos:
+        default: "VITE_API_V1_CONTENIDOS"
+      ViteApiV1Evaluaciones:
+        default: "VITE_API_V1_EVALUACIONES"
+
+Parameters:
+  AppName:
+    Type: "String"
+    Default: "aurion-lms-frontend"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "[A-Za-z0-9][A-Za-z0-9._-]*"
+    ConstraintDescription: "Usa letras, numeros, puntos, guiones o guiones bajos."
+    Description: "Nombre de la nueva aplicacion de Amplify Hosting."
+  RepositoryUrl:
+    Type: "String"
+    AllowedPattern: "https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?"
+    ConstraintDescription: "Introduce la URL HTTPS del repositorio GitHub, no una URL /tree/ ni el sitio publicado."
+    Description: "Ejemplo: https://github.com/tu-usuario/frontend_p2. package.json debe estar en la raiz."
+  BranchName:
+    Type: "String"
+    Default: "main"
+    MinLength: 1
+    MaxLength: 63
+    AllowedPattern: "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    ConstraintDescription: "Usa una rama existente de hasta 63 caracteres, con minusculas, numeros y guiones; sin barras."
+    Description: "Rama existente que se publicara. Su nombre se usa como subdominio del frontend."
+  GitHubAccessToken:
+    Type: "String"
+    NoEcho: true
+    MinLength: 1
+    MaxLength: 4096
+    AllowedPattern: "\\S+"
+    ConstraintDescription: "Introduce un token de GitHub valido, sin espacios."
+    Description: "Token personal para conectar GitHub. Instala primero la GitHub App de Amplify para esta region."
+  ViteApiV1User:
+    Type: "String"
+    MinLength: 1
+    MaxLength: 2048
+    AllowedPattern: "https://[^\\s/?#]+(?:/[^\\s?#]*)?"
+    ConstraintDescription: "Introduce una URL HTTPS sin espacios, parametros de consulta ni fragmentos."
+    Description: "URL base de Usuarios (login y perfil), incluyendo el stage. Acepta /dev o /dev/v1."
+  ViteApiV1Course:
+    Type: "String"
+    MinLength: 1
+    MaxLength: 2048
+    AllowedPattern: "https://[^\\s/?#]+(?:/[^\\s?#]*)?"
+    ConstraintDescription: "Introduce una URL HTTPS sin espacios, parametros de consulta ni fragmentos."
+    Description: "URL base de Cursos, incluyendo el stage. Acepta /dev o /dev/v1."
+  ViteApiV1Matriculas:
+    Type: "String"
+    MinLength: 1
+    MaxLength: 2048
+    AllowedPattern: "https://[^\\s/?#]+(?:/[^\\s?#]*)?"
+    ConstraintDescription: "Introduce una URL HTTPS sin espacios, parametros de consulta ni fragmentos."
+    Description: "URL base de Matriculas, incluyendo el stage. Acepta /dev o /dev/v1."
+  ViteApiV1Contenidos:
+    Type: "String"
+    MinLength: 1
+    MaxLength: 2048
+    AllowedPattern: "https://[^\\s/?#]+(?:/[^\\s?#]*)?"
+    ConstraintDescription: "Introduce una URL HTTPS sin espacios, parametros de consulta ni fragmentos."
+    Description: "URL base de Contenidos (materiales), incluyendo el stage. Acepta /dev o /dev/v1."
+  ViteApiV1Evaluaciones:
+    Type: "String"
+    MinLength: 1
+    MaxLength: 2048
+    AllowedPattern: "https://[^\\s/?#]+(?:/[^\\s?#]*)?"
+    ConstraintDescription: "Introduce una URL HTTPS sin espacios, parametros de consulta ni fragmentos."
+    Description: "URL base de Evaluaciones, incluyendo el stage. Acepta /dev o /dev/v1."
+
+Resources:
+  AmplifyApp:
+    Type: "AWS::Amplify::App"
+    Properties:
+      Name: !Ref AppName
+      Description: "Frontend estatico Aurion LMS - React, TypeScript y Vite."
+      Platform: "WEB"
+      Repository: !Ref RepositoryUrl
+      AccessToken: !Ref GitHubAccessToken
+      EnableBranchAutoDeletion: false
+      EnvironmentVariables:
+        - Name: "VITE_API_V1_USER"
+          Value: !Ref ViteApiV1User
+        - Name: "VITE_API_V1_COURSE"
+          Value: !Ref ViteApiV1Course
+        - Name: "VITE_API_V1_MATRICULAS"
+          Value: !Ref ViteApiV1Matriculas
+        - Name: "VITE_API_V1_CONTENIDOS"
+          Value: !Ref ViteApiV1Contenidos
+        - Name: "VITE_API_V1_EVALUACIONES"
+          Value: !Ref ViteApiV1Evaluaciones
+      BuildSpec: |
+        version: 1
+        frontend:
+          phases:
+            preBuild:
+              commands:
+                - nvm install 24
+                - nvm use 24
+                - npm ci --cache .npm --prefer-offline
+            build:
+              commands:
+                - npm run build
+          artifacts:
+            baseDirectory: dist
+            files:
+              - '**/*'
+          cache:
+            paths:
+              - .npm/**/*
+      CustomRules:
+        - Source: "</^[^.]+$|\\.(?!(html|css|gif|ico|jpg|jpeg|js|mjs|png|txt|svg|woff|woff2|ttf|eot|map|json|webp|avif|pdf|webm|mp4)$)([^.]+$)/>"
+          Target: "/index.html"
+          Status: "200"
+  AmplifyBranch:
+    Type: "AWS::Amplify::Branch"
+    Properties:
+      AppId: !GetAtt AmplifyApp.AppId
+      BranchName: !Ref BranchName
+      Description: "Rama publicada del frontend Aurion LMS."
+      EnableAutoBuild: true
+      EnablePullRequestPreview: false
+      Framework: "React"
+      Stage: "PRODUCTION"
+
+Outputs:
+  AmplifyAppId:
+    Description: "Identificador de la aplicacion creada en Amplify."
+    Value: !GetAtt AmplifyApp.AppId
+  FrontendUrl:
+    Description: "URL del frontend. Estara disponible cuando el build de Amplify termine correctamente."
+    Value: !Sub "https://${BranchName}.${AmplifyApp.DefaultDomain}"
+  AmplifyConsoleUrl:
+    Description: "Consola de Amplify para iniciar el primer build y revisar sus logs."
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/amplify/apps/${AmplifyApp.AppId}/overview"
+  StartBuildCommand:
+    Description: "Ejecuta este comando en AWS CloudShell o AWS CLI para publicar el ultimo commit, tambien tras cambiar las URLs."
+    Value: !Sub "aws amplify start-job --app-id ${AmplifyApp.AppId} --branch-name ${BranchName} --job-type RELEASE --region ${AWS::Region}"

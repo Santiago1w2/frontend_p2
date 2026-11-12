@@ -103,7 +103,7 @@ export default function DashboardPage() {
         <span className="hero-course-code">{focus.courseId}</span>
         <h3>{focus.title}</h3>
         <p>{focus.description||'Abre este espacio para explorar sus materiales y evaluaciones.'}</p>
-        <div className="hero-course-footer"><span>{student? 'Volver al curso':'Abrir curso'}</span><span className="round-arrow"><Icon name="arrow" size={19} /></span></div>
+        <div className="hero-course-footer"><span>{student? 'Abrir mi curso':'Abrir curso'}</span><span className="round-arrow"><Icon name="arrow" size={19} /></span></div>
         <span className="hero-course-decoration" aria-hidden="true" />
       </Link>}
     </section>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     <section className="dashboard-courses">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">{student? 'CONTINÚA DONDE LO DEJASTE':'APRENDIZAJE EN MARCHA'}</p>
+          <p className="eyebrow">{student? 'TU ESPACIO DE ESTUDIO':'APRENDIZAJE EN MARCHA'}</p>
           <h2>{admin? 'Cursos de tu campus':'Tu siguiente capítulo'}</h2>
         </div>
         <Link className="text-link" href={admin? '/app/courses':'/app/my-courses'}>Ver {admin? 'cursos':'mis cursos'}<Icon name="arrow" size={16} /></Link>

@@ -24,7 +24,11 @@ export class ApiClient {
     const signals = [options.signal, options.public ? undefined : scope].filter((signal): signal is AbortSignal => Boolean(signal))
     try {
       const response = await this.transport.request<unknown>({
-        baseURL: versionedBase(this.url), url: path, method, data: body, params: options.params,
+        baseURL: versionedBase(this.url), 
+        url: path, 
+        method, 
+        data: body, 
+        params: options.params,
         signal: signals.length ? AbortSignal.any(signals) : undefined, timeout: 35000,
         headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
       })
@@ -33,7 +37,9 @@ export class ApiClient {
     } catch (error) {
       if (error instanceof ApiError || axios.isCancel(error) || (error instanceof DOMException && error.name === 'AbortError')) throw error
       if (axios.isAxiosError(error)) {
+
         const status = error.response?.status
+        
         if (status === 401 || status === 403) {
           if (!options.public && token === session.token()) session.clear('expired')
           throw new ApiError('SESSION_EXPIRED', 'La sesión expiró.', undefined, status)
@@ -48,6 +54,7 @@ export class ApiClient {
   post<T>(path: string, body?: unknown, options?: RequestOptions) { return this.request<T>('POST', path, body, options) }
   patch<T>(path: string, body: unknown, options?: RequestOptions) { return this.request<T>('PATCH', path, body, options) }
 }
+
 export const API_USER = new ApiClient(import.meta.env.VITE_API_V1_USER)
 export const API_COURSE = new ApiClient(import.meta.env.VITE_API_V1_COURSE)
 export const API_ENROLLMENT = new ApiClient(import.meta.env.VITE_API_V1_MATRICULAS)

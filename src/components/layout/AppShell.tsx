@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect,useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth,useUser } from '../../context/AuthContext'
 import { Link } from '../../lib/router'
@@ -93,6 +93,12 @@ function Breadcrumbs() {
 export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed,setCollapsed]=useState(() => preference('sidebar',window.matchMedia('(max-width: 1100px)').matches? 'collapsed':'expanded')==='collapsed')
   const [mobile,setMobile]=useState(false)
+  useEffect(() => {
+    const desktop=window.matchMedia('(min-width: 761px)')
+    function closeOnDesktop() { if(desktop.matches) setMobile(false) }
+    desktop.addEventListener('change',closeOnDesktop)
+    return () => desktop.removeEventListener('change',closeOnDesktop)
+  },[])
   function toggle() { setCollapsed(!collapsed); savePreference('sidebar',collapsed? 'expanded':'collapsed') }
   return <div className={'app-shell '+(collapsed? 'sidebar-collapsed':'')}>
     <a href="#main-content" className="skip-link">Saltar al contenido</a>

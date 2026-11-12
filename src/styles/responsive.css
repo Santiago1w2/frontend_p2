@@ -104,14 +104,12 @@
   .form-grid { grid-template-columns: 1fr; }
   .dialog { padding: 25px; }
   .login-page { grid-template-columns: 1fr; gap: 0; padding: 12px; }
-  .login-story { min-height: auto; padding: 25px 28px; border-radius: 22px; }
+  .login-story { min-height: 145px; padding: 25px 28px; border-radius: 22px; }
   .login-story .brand-lockup { width: 149px; height: 43px; }
-  .login-editorial { padding: 30px 0 28px; }
-  .login-editorial h1 { max-width: 370px; margin: 20px 0; font-size: clamp(34px, 6vw, 46px); }
-  .login-editorial > p:last-of-type { max-width: 270px; font-size: 12px; }
-  .login-editorial .eyebrow { font-size: 8px; }
-  .login-art { width: 310px; right: -65px; bottom: -75px; opacity: .55; }
-  .login-footer { font-size: 7px; }
+  .login-editorial { position: absolute; inset: 0; padding: 0; pointer-events: none; }
+  .login-editorial h1, .login-editorial > p { display: none; }
+  .login-art { width: 260px; right: -35px; bottom: -85px; opacity: .55; }
+  .login-footer { position: relative; margin-top: 18px; padding-top: 0; border: 0; font-size: 7px; }
   .login-footer > span:last-child { display: none; }
   .login-form-side { min-height: 600px; padding: 78px 25px 75px; }
   .login-form-wrap { max-width: 420px; }

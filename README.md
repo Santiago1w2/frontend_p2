@@ -1,4 +1,4 @@
-# Folio · Frontend LMS
+# Aurion · Frontend LMS
 
 Continuación del frontend existente en React 19, TypeScript y Vite. Consume los cinco microservicios documentados en [API.md](API.md). No incluye ni modifica el backend.
 
@@ -79,7 +79,7 @@ No se instalaron dependencias nuevas: la red del entorno impidió añadir Router
 
 ## Datos, paginación y diseño
 
-La identidad Folio utiliza superficies cálidas, acentos vegetales, tipografía de sistema legible, iconografía vectorial consistente y tokens claros/oscuros. No depende de Google Fonts ni de imágenes remotas. Sidebar compacta persistente, drawer móvil, foco visible y reduced motion.
+La identidad Aurion sigue la dirección Creative Campus: sidebar ciruela, superficies cálidas, acentos lavanda y durazno, composición editorial, tarjetas de curso con tratamientos deterministas y un isotipo SVG original de cintas. Los tokens semánticos, escalas tipográficas y variantes claro/oscuro se centralizan en src/index.css. No depende de fuentes ni imágenes remotas. Sidebar compacta persistente, drawer móvil, foco visible y reduced motion. Ver DESIGN.md para recursos, decisiones y alcance del rediseño.
 
 Las referencias reales encontradas fueron ideas/js-components/sidebars/sidebar-14, ideas/js-components/dropdowns y ideas/js-components/controls, además de sus equivalentes React. Se adaptaron sus patrones, sin copiar sus fondos, dependencias ni sus manipulaciones directas del DOM. Las rutas con errores ortográficos del encargo no existen literalmente; las carpetas de referencia no se alteraron.
 
@@ -116,3 +116,9 @@ Abre http://127.0.0.1:4173. Cuentas de fixture: student@example.test, teacher@ex
 ## Publicación
 
 npm run build genera dist. El hosting debe servir index.html como fallback para rutas /app/* y /login (SPA). No se creó otro proyecto, no se registró hosting nuevo ni se desplegaron cambios. La comprobación contra AWS requiere una sesión autorizada y conectividad; las pruebas aisladas no certifican el despliegue, CORS real ni permisos server-side.
+
+### AWS Amplify con CloudFormation
+
+Sube [`cloudformation/amplify-frontend.yaml`](cloudformation/amplify-frontend.yaml) en **CloudFormation → Create stack → Upload a template file**. Al continuar, el formulario te pedirá el link del repositorio GitHub del frontend, la rama, un token de GitHub oculto y las cinco variables `VITE_API_V1_*`. No necesitas editar la plantilla ni subir tu `.env`.
+
+La plantilla configura la compilación de Vite, publica `dist` y añade las reglas SPA. Al terminar el stack, ejecuta la salida `StartBuildCommand` en AWS CloudShell para iniciar la publicación; los siguientes pushes se compilan automáticamente. La URL resultante aparece en `FrontendUrl`. Consulta los requisitos de GitHub y el paso a paso en [`cloudformation/README.md`](cloudformation/README.md).
