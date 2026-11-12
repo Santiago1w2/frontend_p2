@@ -11,7 +11,7 @@ import type { IconName } from '../ui/Icon'
 import { Dialog,Button } from '../ui/Controls'
 import { Dropdown } from '../ui/Dropdown'
 import { ThemeToggle } from './ThemeToggle'
-import { Brand,BrandMark } from '../shared/Brand'
+import { Brand} from '../shared/Brand'
 
 interface NavItem { href: string; label: string; icon: IconName; exact?: boolean }
 function UserMenu() {
@@ -64,9 +64,6 @@ function AppSidebar({ collapsed,toggle,mobile,close }: { collapsed: boolean; tog
         </Link>
       })}
     </nav>
-    <div className="sidebar-note">
-      <BrandMark />
-    </div>
     <div className="sidebar-bottom">
       <Link href="/app/profile" onClick={close} className={'nav-link '+(location==='/app/profile'? 'active':'')} data-tip="Mi perfil">
         <Icon name="user" size={19} />
