@@ -8,6 +8,7 @@ import { queryCache } from '../src/lib/queryCache.ts'
 import DashboardPage from '../src/features/dashboard/DashboardPage.tsx'
 import CourseDetail from '../src/features/courses/CourseDetail.tsx'
 import CourseForm from '../src/features/courses/CourseForm.tsx'
+import CoursesPage from '../src/features/courses/CoursesPage.tsx'
 import EvaluationDetail from '../src/features/evaluations/EvaluationDetail.tsx'
 
 const student = { userId: 'student', tenantId: 'tenant', email: 'student@example.test', role: 'student', status: 'active' }
@@ -59,4 +60,44 @@ for (const user of [teacher, admin]) test(user.role + ' dashboard renders API co
   assert.ok(!html.includes('FOLIO'))
   assert.ok(html.includes('registros cargados'))
   for (const fakeMetric of ['Total de estudiantes', 'Tasa de aprobación', 'Racha de estudio', '100% completado']) assert.ok(!html.includes(fakeMetric))
+})
+
+test('student catalog keeps searching when a page has drafts but more courses exist', () => {
+  seed(student, 'courses', { items: [{ ...course, status: 'draft' }], nextToken: 'later-page', cursors: [] }, 'all')
+  seed(student, 'enrollments', { items: [], nextToken: null, cursors: [] }, 'mine')
+  const html = render(student, CoursesPage)
+  assert.ok(html.includes('Buscando cursos que coincidan'))
+  assert.ok(html.includes('Cargando contenido'))
+  assert.ok(!html.includes('Todavía no hay cursos visibles'))
+  assert.ok(!html.includes(course.title))
+})
+
+test('student catalog shows an empty result only after the last nonpublished page', () => {
+  seed(student, 'courses', { items: [{ ...course, status: 'draft' }], nextToken: null, cursors: [] }, 'all')
+  seed(student, 'enrollments', { items: [], nextToken: null, cursors: [] }, 'mine')
+  const html = render(student, CoursesPage)
+  assert.ok(html.includes('Todavía no hay cursos visibles'))
+  assert.ok(!html.includes('Buscando cursos que coincidan'))
+})
+
+test('draft course owners see the publishing instructions and edit link', () => {
+  seed(admin, 'course', { ...course, status: 'draft' }, course.courseId)
+  const html = render(admin, CourseDetail, { courseId: course.courseId })
+  assert.ok(html.includes('selecciona Estado: Publicado y guarda los cambios'))
+  assert.ok(html.includes('/app/courses/course/edit'))
+})
+
+test('course creation explains how to publish after saving the draft', () => {
+  const html = render(admin, CourseForm)
+  assert.ok(html.includes('El curso se guardará como borrador'))
+  assert.ok(html.includes('abre Editar curso, selecciona Estado: Publicado'))
+  assert.ok(!html.includes('id="course-status"'))
+})
+
+test('course editor exposes the saved status and its effect on enrollment', () => {
+  seed(admin, 'course', course, course.courseId)
+  const html = render(admin, CourseForm, { courseId: course.courseId })
+  assert.ok(html.includes('id="course-status"'))
+  assert.ok(html.includes('value="published" selected=""'))
+  assert.ok(html.includes('aparece en el catálogo de tu campus y admite matrículas'))
 })

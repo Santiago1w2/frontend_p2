@@ -52,6 +52,7 @@ export default function CourseDetail({ courseId,section='overview' }: { courseId
       <span>Creado el {date(course.createdAt)}</span>
       {editable&&<Link href={'/app/enrollments?courseId='+encodeURIComponent(courseId)}>Ver estudiantes <Icon name="arrow" size={15} /></Link>}
     </div>
+    {editable&&course.status==='draft'&&<div className="notice">Este curso está en borrador. Para mostrarlo en el catálogo de estudiantes de tu campus, abre Editar curso, selecciona Estado: Publicado y guarda los cambios. <Link href={root+'/edit'}>Editar curso</Link></div>}
     <ErrorState error={enroll.error} compact />
     <ErrorState error={membership.error} retry={() => void membership.refetch()} />
     {student&&membership.isLoading&&<p className="scope-note" role="status">Comprobando tu matrícula…</p>}

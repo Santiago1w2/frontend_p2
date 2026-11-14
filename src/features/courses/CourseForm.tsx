@@ -47,13 +47,13 @@ function Editor({ course }: { course?: Course }) {
       <FormField id="course-description" label="Descripción" hint="Cuéntales a tus estudiantes qué van a descubrir.">
         <textarea id="course-description" rows={6} value={description} onChange={event => setDescription(event.target.value)} disabled={action.pending} />
       </FormField>
-      {course? <FormField id="course-status" label="Estado">
+      {course? <FormField id="course-status" label="Estado" hint="Publicado: aparece en el catálogo de tu campus y admite matrículas. Borrador: sigue en preparación. Archivado: no admite nuevas matrículas.">
         <select id="course-status" value={status} onChange={event => setStatus(event.target.value as CourseStatus)} disabled={action.pending}>
           <option value="draft">Borrador</option>
           <option value="published">Publicado</option>
           <option value="archived">Archivado</option>
         </select>
-      </FormField>:<div className="notice"><Icon name="file" size={18} />Los nuevos cursos se crean como borrador y se asignan a tu cuenta.</div>}
+      </FormField>:<div className="notice"><Icon name="file" size={18} />El curso se guardará como borrador y se asignará a tu cuenta. Para mostrarlo a estudiantes de tu campus, abre Editar curso, selecciona Estado: Publicado y guarda los cambios.</div>}
       <div className="form-actions">
         <Link className="button button-secondary" href={course? '/app/courses/'+encodeURIComponent(course.courseId):'/app/my-courses'}>Cancelar</Link>
         <Button type="submit" loading={action.pending}>

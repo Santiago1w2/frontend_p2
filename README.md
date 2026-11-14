@@ -83,7 +83,11 @@ La identidad Aurion sigue la dirección Creative Campus: sidebar ciruela, superf
 
 Las referencias reales encontradas fueron ideas/js-components/sidebars/sidebar-14, ideas/js-components/dropdowns y ideas/js-components/controls, además de sus equivalentes React. Se adaptaron sus patrones, sin copiar sus fondos, dependencias ni sus manipulaciones directas del DOM. Las rutas con errores ortográficos del encargo no existen literalmente; las carpetas de referencia no se alteraron.
 
-Listados de cursos, usuarios y matrículas cargan páginas de 20 registros. Los filtros indican explícitamente que operan sobre lo cargado. nextToken se pasa intacto; páginas vacías no significan fin si hay cursor. Se detectan ciclos de cursores. Nunca se presenta el tamaño de una página como total del campus.
+Listados de cursos, usuarios y matrículas consultan páginas de 20 registros. En usuarios, seleccionar un rol recorre automáticamente las páginas sin coincidencias hasta encontrar ese rol o terminar la lista; cada rol conserva su propia paginación. La búsqueda por correo o ID de usuarios opera sobre los registros cargados. En Cursos y Mis cursos, la búsqueda por nombre o ID y el filtro de estado avanzan automáticamente hasta encontrar coincidencias o terminar las páginas; el catálogo del estudiante busca solo cursos publicados. nextToken se pasa intacto; páginas vacías no significan fin si hay cursor. Se detectan ciclos de cursores. Nunca se presenta el tamaño de una página como total del campus.
+
+Los nuevos cursos se guardan como borrador. Para publicarlos, abrir el curso → Editar curso → Estado: Publicado → Guardar cambios. El cambio se guarda mediante PATCH /v1/courses/{courseId}; aparece en el catálogo del mismo tenant y habilita matrículas, sin volver a desplegar la aplicación.
+
+`node tests/course-filters.browser.mjs` valida filtros, búsqueda, publicación y Mis cursos en Chrome/Edge sin interfaz y con datos locales de prueba. Usa puertos y perfil temporales, sin llamadas a AWS; se puede indicar el ejecutable con `LMS_TEST_BROWSER`.
 
 Mis cursos del estudiante resuelve matrículas activas por studentId y consulta cursos en grupos de cuatro, reutilizando la caché individual. Los cursos inexistentes se señalan sin romper el listado. El dashboard muestra una vista rápida, no estadísticas globales. Su actividad se limita explícitamente al curso seleccionado: materiales recientes y evaluaciones reales de ese curso.
 

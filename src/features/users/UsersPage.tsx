@@ -3,7 +3,8 @@ import type { FormEvent } from 'react'
 import { usePaged,useQuery } from '../../hooks/useQuery'
 import { useScope } from '../../hooks/useCourses'
 import { useAction } from '../../hooks/useAction'
-import { userList,userCreate,userFindId } from '../../services/AuthService'
+import { userListByRole,userCreate,userFindId } from '../../services/AuthService'
+import type { UserRoleFilter } from '../../services/AuthService'
 import type { Role,UserCreateRequest } from '../../types/User'
 import { roleLabels } from '../../lib/permissions'
 import { date } from '../../lib/format'
@@ -48,24 +49,24 @@ function CreateUser({ close }: { close: () => void }) {
 }
 export default function UsersPage() {
   const scope=useScope()
-  const query=usePaged([...scope,'users'],(nextToken,signal) => userList({ nextToken,limit: 20 },signal))
   const [search,setSearch]=useState('')
-  const [role,setRole]=useState('all')
+  const [role,setRole]=useState<UserRoleFilter>('all')
+  const query=usePaged([...scope,'users',role],(nextToken,signal) => userListByRole(role,{ nextToken,limit: 20 },signal))
   const [open,setOpen]=useState(false)
-  const items=query.items.filter(user => (role==='all'||role===user.role)&&(user.email+' '+user.userId).toLowerCase().includes(search.toLowerCase()))
+  const items=query.items.filter(user => (user.email+' '+user.userId).toLowerCase().includes(search.toLowerCase()))
   return <>
     <PageHeader eyebrow="LAS PERSONAS HACEN EL CAMPUS" title="Tu comunidad." description="Gestiona los accesos de estudiantes, docentes y administradores." action={<Button onClick={() => setOpen(true)}><Icon name="plus" size={18} />Crear usuario</Button>} />
     <div className="toolbar">
       <SearchInput value={search} onChange={setSearch} label="Buscar en usuarios cargados" />
       <label className="inline-select">
-        <span className="sr-only">Filtrar rol en registros cargados</span>
-        <select value={role} onChange={event => setRole(event.target.value)}>
+        <span className="sr-only">Filtrar usuarios por rol</span>
+        <select value={role} onChange={event => setRole(event.target.value as UserRoleFilter)}>
           <option value="all">Todos los roles</option>
           {Object.entries(roleLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
     </div>
-    <p className="scope-note">Búsqueda y filtros locales: solo incluyen las páginas cargadas.</p>
+    <p className="scope-note">El filtro de rol consulta los usuarios de tu campus. La búsqueda por correo o ID solo incluye los resultados cargados.</p>
     <ErrorState error={query.error} retry={() => void query.refetch()} />
     {query.isLoading? <LoadingSkeleton />:items.length? <div className="table-wrap" role="region" aria-label="Usuarios de tu campus" tabIndex={0}>
       <table>
@@ -110,7 +111,7 @@ export default function UsersPage() {
           </tr>)}
         </tbody>
       </table>
-    </div>:!query.error&&<EmptyState icon="users" title="Sin personas en esta vista" description={query.hasMore? 'Carga más usuarios o ajusta los filtros locales.':'Prueba otra búsqueda o crea un usuario.'} />}
+    </div>:!query.error&&<EmptyState icon="users" title="Sin personas en esta vista" description={search? query.hasMore? 'Carga más usuarios o ajusta la búsqueda.':'Prueba otra búsqueda.':role==='all'? 'Todavía no hay usuarios en tu campus.':'No hay usuarios con este rol en tu campus.'} />}
     <PaginationControls count={query.items.length} hasMore={query.hasMore} loading={query.loadingMore} onMore={() => void query.loadMore()} error={query.moreError} />
     {open&&<CreateUser close={() => setOpen(false)} />}
   </>

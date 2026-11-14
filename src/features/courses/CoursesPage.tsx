@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect,useState } from 'react'
 import { useUser } from '../../context/AuthContext'
 import { useCourseCollection } from '../../hooks/useCourses'
 import { useScope } from '../../hooks/useCourses'
@@ -18,6 +18,7 @@ export default function CoursesPage({ mine=false }: { mine?: boolean }) {
   const memberships=usePaged([...scope,'enrollments','mine'],(nextToken,signal) => enrollmentList({ studentId: user.userId,nextToken,limit: 20 },signal),user.role==='student'&&!mine)
   const query=useCourseCollection(mine? 'mine':'all')
   const [search,setSearch]=useState('')
+  const [searchQuery,setSearchQuery]=useState('')
   const [status,setStatus]=useState('all')
   const [view,setView]=useState<'grid'|'list'>('grid')
   const publishedOnly=user.role==='student'&&!mine
@@ -27,14 +28,25 @@ export default function CoursesPage({ mine=false }: { mine?: boolean }) {
     if(enrolledIds.has(courseId)) return 'enrolled'
     return memberships.status==='success'&&!memberships.hasMore? 'available':'unknown'
   }
-  const visible=query.items.filter(course => (!publishedOnly||course.status==='published')&&(status==='all'||course.status===status)&&(course.title+' '+course.courseId).toLowerCase().includes(search.toLowerCase()))
+  const normalizedSearch=search.trim().toLowerCase()
+  const waitingForSearch=normalizedSearch!==searchQuery
+  const visible=query.items.filter(course => (!publishedOnly||course.status==='published')&&(status==='all'||course.status===status)&&(course.title+' '+course.courseId).toLowerCase().includes(searchQuery))
+  const seeking=visible.length===0&&query.hasMore&&!query.error&&!query.moreError
+  const { isLoading,loadingMore,fetching,loadMore }=query
+  useEffect(() => {
+    const timer=window.setTimeout(() => setSearchQuery(normalizedSearch),300)
+    return () => window.clearTimeout(timer)
+  },[normalizedSearch])
+  useEffect(() => {
+    if(seeking&&!waitingForSearch&&!isLoading&&!loadingMore&&!fetching) void loadMore()
+  },[seeking,waitingForSearch,isLoading,loadingMore,fetching,loadMore])
   return <>
     <PageHeader eyebrow={mine? 'TU ESPACIO ACADÉMICO':'DESCUBRE ALGO NUEVO'} title={mine? 'Mis cursos':user.role==='student'? 'Tu próxima gran idea.':'Cursos del campus'} description={mine? 'Todo lo que estás construyendo, en un mismo lugar.':publishedOnly? 'Explora los cursos publicados. Abre un curso para comprobar tu matrícula y disponibilidad.':'Organiza, publica y acompaña el aprendizaje de tu campus.'} action={canCreate(user)&&<Link className="button button-primary" href="/app/courses/new"><Icon name="plus" size={18} />Crear curso</Link>} />
     <div className="toolbar">
-      <SearchInput value={search} onChange={setSearch} label="Buscar en cursos cargados" />
+      <SearchInput value={search} onChange={setSearch} label="Buscar cursos por nombre o ID" />
       <div className="toolbar-right">
         {!publishedOnly&&<label className="inline-select">
-          <span className="sr-only">Filtrar estado en registros cargados</span>
+          <span className="sr-only">Filtrar cursos por estado</span>
           <select value={status} onChange={event => setStatus(event.target.value)}>
             <option value="all">Todos los estados</option>
             <option value="published">Publicados</option>
@@ -52,13 +64,14 @@ export default function CoursesPage({ mine=false }: { mine?: boolean }) {
         </div>
       </div>
     </div>
-    <p className="scope-note">La búsqueda y los filtros se aplican solo a los registros cargados.{publishedOnly&&' Los borradores y archivados no se muestran.'}</p>
+    <p className="scope-note">La búsqueda y el filtro de estado buscan coincidencias en tus cursos.{publishedOnly&&' Solo se muestran los cursos publicados de tu campus.'}</p>
     {query.missing>0&&<div className="notice">{query.missing} matrículas apuntan a cursos que ya no están disponibles.</div>}
     <ErrorState error={publishedOnly? memberships.error:null} retry={() => void memberships.refetch()} compact />
     {publishedOnly&&memberships.hasMore&&<div className="notice">Algunas matrículas aún no están cargadas. La disponibilidad se confirma al abrir el curso.<Button variant="ghost" loading={memberships.loadingMore} onClick={() => void memberships.loadMore()}>Comprobar más matrículas</Button></div>}
     <ErrorState error={publishedOnly? memberships.moreError:null} compact />
     <ErrorState error={query.error} retry={() => void query.refetch()} />
-    {query.isLoading? <LoadingSkeleton />:visible.length? view==='grid'? <div className="course-grid">
+    {seeking&&!query.isLoading&&<p className="scope-note" role="status">Buscando cursos que coincidan…</p>}
+    {query.isLoading||waitingForSearch||seeking? <LoadingSkeleton />:visible.length? view==='grid'? <div className="course-grid">
       {visible.map(course => <CourseCard key={course.courseId} course={course} enrolled={mine&&user.role==='student'} membership={membershipLabel(course.courseId)} />)}
     </div>:<div className="course-list">
       {visible.map(course => <Link href={'/app/courses/'+encodeURIComponent(course.courseId)} className="course-list-row" key={course.courseId}>
@@ -73,7 +86,7 @@ export default function CoursesPage({ mine=false }: { mine?: boolean }) {
         {publishedOnly&&<span className="membership-label">{membershipLabel(course.courseId)==='enrolled'? 'Matriculado':membershipLabel(course.courseId)==='available'? 'Disponible':'Por comprobar'}</span>}
         <Icon name="arrow" size={18} />
       </Link>)}
-    </div>:!query.error&&<EmptyState title={search||status!=='all'? 'Sin coincidencias en lo cargado':mine? 'Tu próximo capítulo empieza aquí':'Todavía no hay cursos visibles'} description={query.hasMore? 'Carga más registros para continuar explorando.':mine&&user.role==='student'? 'Explora el catálogo y encuentra un curso para empezar.':'Cuando haya cursos disponibles, aparecerán en este espacio.'} action={mine&&user.role==='student'? <Link className="button button-primary" href="/app/courses">Explorar cursos <Icon name="arrow" size={16} /></Link>:canCreate(user)? <Link className="button button-primary" href="/app/courses/new">Crear un curso</Link>:undefined} />}
+    </div>:!query.error&&!query.moreError&&<EmptyState title={searchQuery||status!=='all'? 'Sin coincidencias':mine? 'Tu próximo capítulo empieza aquí':'Todavía no hay cursos visibles'} description={searchQuery||status!=='all'? 'Prueba otro nombre, ID o estado.':mine&&user.role==='student'? 'Explora el catálogo y encuentra un curso para empezar.':'Cuando haya cursos disponibles, aparecerán en este espacio.'} action={mine&&user.role==='student'? <Link className="button button-primary" href="/app/courses">Explorar cursos <Icon name="arrow" size={16} /></Link>:canCreate(user)? <Link className="button button-primary" href="/app/courses/new">Crear un curso</Link>:undefined} />}
     <PaginationControls count={query.loaded} hasMore={query.hasMore} loading={query.loadingMore} onMore={() => void query.loadMore()} error={query.moreError} />
   </>
 }
