@@ -94,7 +94,7 @@ function Editor({ courseId,evaluation }: { courseId: string; evaluation?: Evalua
         </div>
       </div>
     </form>
-    <ConfirmDialog open={Boolean(confirm)} onClose={() => setConfirm(null)} title={confirm==='published'? '¿Publicar esta evaluación?':'¿Cerrar esta evaluación?'} description={confirm==='published'? 'Será visible para los estudiantes matriculados en el curso.':'Dejará de estar visible para estudiantes. Sus respuestas locales no se guardan en el servidor.'} pending={action.pending} error={<ErrorState error={action.error} compact />} onConfirm={() => { if(confirm) void action.run(confirm) }} />
+    <ConfirmDialog open={Boolean(confirm)} onClose={() => setConfirm(null)} title={confirm==='published'? '¿Publicar esta evaluación?':'¿Cerrar esta evaluación?'} description={confirm==='published'? 'Será visible para los estudiantes matriculados en el curso.':'Dejará de admitir entregas. Las calificaciones guardadas se podrán consultar desde su enlace de resultado.'} pending={action.pending} error={<ErrorState error={action.error} compact />} onConfirm={() => { if(confirm) void action.run(confirm) }} />
   </>
 }
 export default function EvaluationEditor({ courseId,evaluationId }: { courseId?: string; evaluationId?: string }) {

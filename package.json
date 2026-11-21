@@ -8,6 +8,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
     "test:ui": "node tests/preview-server.mjs",
+    "test:browser": "node tests/course-filters.browser.mjs && node tests/entity-search.browser.mjs && node tests/evaluations.browser.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

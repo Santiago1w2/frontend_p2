@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const root = new URL('../', import.meta.url)
 const read = filename => readFileSync(new URL(filename, root), 'utf8')
-const template = read('cloudformation/amplify-frontend.yaml')
+const template = read('amplify-frontend.yaml')
 const interpolation = name => '$' + '{' + name + '}'
 
 function block(source, name, indentation = 0, indicator = '') {

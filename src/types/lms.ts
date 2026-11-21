@@ -32,3 +32,16 @@ export interface Evaluation extends EvaluationInput {
   updatedAt?: string
 }
 export type EvaluationPatch = Partial<Omit<EvaluationInput, 'courseId'>> & { status?: EvaluationStatus }
+export interface QuizSubmission { answers: number[] }
+export interface QuizSubmissionResult {
+  evaluationId: string
+  score: number
+  correctAnswers: number
+  totalQuestions: number
+  submittedAt: string
+}
+export interface EvaluationResult extends QuizSubmissionResult {
+  studentId: string
+  tenantId: string
+  answers: number[]
+}

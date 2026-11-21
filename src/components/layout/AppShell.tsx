@@ -42,6 +42,7 @@ function AppSidebar({ collapsed,toggle,mobile,close }: { collapsed: boolean; tog
   else if(user.role==='teacher') items.push({ href: '/app/my-courses',label: 'Mis cursos',icon: 'book' },{ href: '/app/courses/new',label: 'Crear curso',icon: 'plus',exact: true })
   else items.push({ href: '/app/users',label: 'Usuarios',icon: 'users' },{ href: '/app/courses',label: 'Cursos',icon: 'book' },{ href: '/app/enrollments',label: 'Matrículas',icon: 'shield' })
   items.push({ href: '/app/evaluations',label: 'Evaluaciones',icon: 'clipboard' })
+  items.push({ href: '/app/results',label: 'Calificaciones',icon: 'check' })
   return <div className={'sidebar-inner '+(collapsed&&!mobile? 'is-collapsed':'')}>
     <div className="sidebar-brand">
       <Link href="/app" className="brand-home" aria-label="Aurion, inicio" onClick={close}><Brand inverse /></Link>
@@ -75,7 +76,7 @@ function AppSidebar({ collapsed,toggle,mobile,close }: { collapsed: boolean; tog
 }
 function Breadcrumbs() {
   const path=useLocation().split('?')[0]
-  const names: Record<string,string>={ courses: 'Cursos','my-courses': 'Mis cursos',users: 'Usuarios',enrollments: 'Matrículas',evaluations: 'Evaluaciones',profile: 'Mi perfil',materials: 'Materiales',new: 'Crear',edit: 'Editar' }
+  const names: Record<string,string>={ courses: 'Cursos','my-courses': 'Mis cursos',users: 'Usuarios',enrollments: 'Matrículas',evaluations: 'Evaluaciones',results: 'Calificaciones',result: 'Resultado',profile: 'Mi perfil',materials: 'Materiales',new: 'Crear',edit: 'Editar' }
   const segments=path.split('/').filter(Boolean).slice(1)
   return <nav aria-label="Ruta de navegación" className="breadcrumbs">
     <Link href="/app">Mi campus</Link>

@@ -37,17 +37,28 @@ export function usePaged<T>(key: QueryKey, loader: (cursor: string | undefined, 
   const [pending, setPending] = useState(false)
   const [moreError, setMoreError] = useState<{ key: string; error: unknown } | null>(null)
   const lock = useRef(false)
+  const moreController = useRef<AbortController | null>(null)
+  const keyId = JSON.stringify(key)
+  useEffect(() => {
+    if (!enabled) return
+    return () => {
+      moreController.current?.abort()
+      queryCache.cancel(JSON.parse(keyId) as QueryKey)
+    }
+  }, [keyId, enabled])
   async function loadMore() {
     const cursor = query.data?.nextToken
-    if (!cursor || lock.current) return
+    if (!enabled || !cursor || lock.current) return
     lock.current = true
     setPending(true)
     setMoreError(null)
     const scope = session.signal()
+    const controller = new AbortController()
+    moreController.current = controller
     try {
-      const page = await loader(cursor, scope)
-      if (!scope.aborted) queryCache.update<Collection<T>>(key, previous => mergePage(previous ?? { items: [], nextToken: null, cursors: [] }, page, cursor))
-    } catch (error) { if (!scope.aborted) setMoreError({ key: JSON.stringify(key), error }) }
+      const page = await loader(cursor, AbortSignal.any([scope, controller.signal]))
+      if (!scope.aborted && !controller.signal.aborted) queryCache.update<Collection<T>>(key, previous => mergePage(previous ?? { items: [], nextToken: null, cursors: [] }, page, cursor))
+    } catch (error) { if (!scope.aborted && !controller.signal.aborted) setMoreError({ key: JSON.stringify(key), error }) }
     finally { setPending(false); lock.current = false }
   }
   return { ...query, items: query.data?.items ?? [], hasMore: Boolean(query.data?.nextToken), loadMore, loadingMore: pending, moreError: moreError?.key === JSON.stringify(key) ? moreError.error : null }

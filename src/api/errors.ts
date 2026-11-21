@@ -32,6 +32,11 @@ const messages: Record<string, string> = {
   SESSION_EXPIRED: 'Tu sesión terminó. Vuelve a iniciar sesión.',
   NETWORK_ERROR: 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.',
   TIMEOUT: 'El servicio tardó demasiado. Comprueba el resultado antes de repetir una operación.',
+  SUBMISSION_UNCERTAIN: 'No pudimos confirmar la entrega. Consulta tu resultado antes de volver a enviar; no se ha repetido el envío automáticamente.',
+  SUBMISSION_INCOMPLETE: 'Selecciona una respuesta válida en cada pregunta antes de enviar.',
+  EVALUATION_CLOSED: 'La evaluación no admite entregas o su fecha límite ya pasó.',
+  S3_ACCESS_DENIED: 'No se pudo acceder al archivo en S3. Solicita al responsable que revise su disponibilidad.',
+  S3_ERROR: 'No se pudo verificar el archivo en S3. Vuelve a intentarlo.',
 }
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return messages[error.code] ?? error.message

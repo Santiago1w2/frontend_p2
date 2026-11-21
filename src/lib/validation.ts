@@ -1,5 +1,25 @@
 import type { EvaluationInput, EvaluationStatus } from '../types/lms'
 export type FieldErrors = Record<string, string>
+export function enrollmentIdError(value: string, field: 'courseId' | 'studentId'): string | undefined {
+  const id = value.trim()
+  const student = field === 'studentId'
+  const label = student ? 'estudiante' : 'curso'
+  const prefix = student ? 'USR-' : 'CRS-'
+  if (!id) return 'Introduce el ID del ' + label + '.'
+  if (id.includes('@')) return 'Introduce el ID del ' + label + ', no un correo electrónico.'
+  if (!id.startsWith(prefix) || id.length === prefix.length) return 'Copia el ID del ' + label + ' que empieza por ' + prefix + ', sin prefijos de DynamoDB.'
+  return undefined
+}
+
+export function validateEnrollment(input: { courseId: string; studentId: string }): FieldErrors {
+  const errors: FieldErrors = {}
+  for (const field of ['courseId', 'studentId'] as const) {
+    const error = enrollmentIdError(input[field], field)
+    if (error) errors[field] = error
+  }
+  return errors
+}
+
 export function validateEvaluation(input: EvaluationInput, status: EvaluationStatus): FieldErrors {
   const errors: FieldErrors = {}
   if (!input.title.trim()) errors.title = 'Escribe un título.'

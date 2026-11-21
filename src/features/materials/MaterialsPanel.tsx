@@ -26,7 +26,7 @@ export default function MaterialsPanel({ courseId,editable }: { courseId: string
     setDownloading(id)
     setDownloadError(null)
     try {
-      const { downloadUrl }=await materialDownload(id,scopeSignal)
+      const { downloadUrl }=await materialDownload(id,scopeSignal,courseId)
       if(!scopeSignal.aborted) window.location.assign(downloadUrl)
     } catch(error) { if(!scopeSignal.aborted) setDownloadError(error) }
     finally { setDownloading('') }

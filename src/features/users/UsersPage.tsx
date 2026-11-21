@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { usePaged,useQuery } from '../../hooks/useQuery'
+import { usePagedSearch } from '../../hooks/usePagedSearch'
+import { useExactSearch } from '../../hooks/useExactSearch'
+import { exactEntityId } from '../../lib/entitySearch'
 import { useScope } from '../../hooks/useCourses'
 import { useAction } from '../../hooks/useAction'
 import { userListByRole,userCreate,userFindId } from '../../services/AuthService'
@@ -50,14 +53,22 @@ function CreateUser({ close }: { close: () => void }) {
 export default function UsersPage() {
   const scope=useScope()
   const [search,setSearch]=useState('')
+  const exactId=exactEntityId(search,'user')
   const [role,setRole]=useState<UserRoleFilter>('all')
-  const query=usePaged([...scope,'users',role],(nextToken,signal) => userListByRole(role,{ nextToken,limit: 20 },signal))
+  const query=usePaged([...scope,'users',role],(nextToken,signal) => userListByRole(role,{ nextToken,limit: 20 },signal),!exactId)
   const [open,setOpen]=useState(false)
-  const items=query.items.filter(user => (user.email+' '+user.userId).toLowerCase().includes(search.toLowerCase()))
+  const exact=useExactSearch([...scope,'users','exact',exactId],exactId,userFindId)
+  const paged=usePagedSearch(query,search,(user,text) => (user.email+' '+user.userId).toLowerCase().includes(text),!exactId)
+  const items=exactId? exact.data&&(role==='all'||exact.data.role===role)? [exact.data]:[]:paged.items
+  const searchQuery=exactId??paged.searchQuery
+  const seeking=!exactId&&paged.seeking
+  const searching=exactId? exact.isLoading:paged.isLoading
+  const error=exactId? exact.error:query.error
+  const moreError=exactId? null:query.moreError
   return <>
     <PageHeader eyebrow="LAS PERSONAS HACEN EL CAMPUS" title="Tu comunidad." description="Gestiona los accesos de estudiantes, docentes y administradores." action={<Button onClick={() => setOpen(true)}><Icon name="plus" size={18} />Crear usuario</Button>} />
     <div className="toolbar">
-      <SearchInput value={search} onChange={setSearch} label="Buscar en usuarios cargados" />
+      <SearchInput value={search} onChange={setSearch} label="Buscar usuarios por correo o ID" />
       <label className="inline-select">
         <span className="sr-only">Filtrar usuarios por rol</span>
         <select value={role} onChange={event => setRole(event.target.value as UserRoleFilter)}>
@@ -66,9 +77,10 @@ export default function UsersPage() {
         </select>
       </label>
     </div>
-    <p className="scope-note">El filtro de rol consulta los usuarios de tu campus. La búsqueda por correo o ID solo incluye los resultados cargados.</p>
-    <ErrorState error={query.error} retry={() => void query.refetch()} />
-    {query.isLoading? <LoadingSkeleton />:items.length? <div className="table-wrap" role="region" aria-label="Usuarios de tu campus" tabIndex={0}>
+    <p className="scope-note">{exactId? 'Consulta por ID completo: '+exactId+'.':'La búsqueda por correo o ID y el filtro de rol buscan coincidencias en los usuarios de tu campus.'}</p>
+    <ErrorState error={error} retry={() => void (exactId? exact.refetch():query.refetch())} />
+    {seeking&&!query.isLoading&&<p className="scope-note" role="status">Buscando usuarios que coincidan…</p>}
+    {searching? <LoadingSkeleton />:items.length? <div className="table-wrap" role="region" aria-label="Usuarios de tu campus" tabIndex={0}>
       <table>
         <caption className="sr-only">Usuarios cargados de tu campus</caption>
         <thead>
@@ -111,8 +123,8 @@ export default function UsersPage() {
           </tr>)}
         </tbody>
       </table>
-    </div>:!query.error&&<EmptyState icon="users" title="Sin personas en esta vista" description={search? query.hasMore? 'Carga más usuarios o ajusta la búsqueda.':'Prueba otra búsqueda.':role==='all'? 'Todavía no hay usuarios en tu campus.':'No hay usuarios con este rol en tu campus.'} />}
-    <PaginationControls count={query.items.length} hasMore={query.hasMore} loading={query.loadingMore} onMore={() => void query.loadMore()} error={query.moreError} />
+    </div>:!error&&!moreError&&<EmptyState icon="users" title="Sin personas en esta vista" description={searchQuery? 'Prueba otro correo, ID o rol.':role==='all'? 'Todavía no hay usuarios en tu campus.':'No hay usuarios con este rol en tu campus.'} />}
+    <PaginationControls count={exactId? items.length:query.items.length} hasMore={!exactId&&query.hasMore} loading={!exactId&&query.loadingMore} onMore={() => void query.loadMore()} error={moreError} />
     {open&&<CreateUser close={() => setOpen(false)} />}
   </>
 }

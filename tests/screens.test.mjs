@@ -10,6 +10,8 @@ import CourseDetail from '../src/features/courses/CourseDetail.tsx'
 import CourseForm from '../src/features/courses/CourseForm.tsx'
 import CoursesPage from '../src/features/courses/CoursesPage.tsx'
 import EvaluationDetail from '../src/features/evaluations/EvaluationDetail.tsx'
+import { EvaluationResultLookup } from '../src/features/evaluations/EvaluationResults.tsx'
+import { ApiError } from '../src/api/errors.ts'
 
 const student = { userId: 'student', tenantId: 'tenant', email: 'student@example.test', role: 'student', status: 'active' }
 const teacher = { ...student, userId: 'teacher', role: 'teacher' }
@@ -19,14 +21,57 @@ const evaluation = { evaluationId: 'evaluation', courseId: 'course', teacherId: 
 beforeEach(() => queryCache.clear())
 function seed(user, name, data, ...rest) { queryCache.update([user.tenantId, user.userId, name, ...rest], () => data) }
 function render(user, component, props) { return renderToStaticMarkup(createElement(AuthContext.Provider, { value: { user, checking: false, busy: false, error: null } }, createElement(component, props))) }
-test('student evaluation identifies local ungraded practice and never renders submission', () => {
+test('student evaluation offers a real submission without exposing correct answers', () => {
   seed(student, 'evaluation', evaluation, 'evaluation')
+  seed(student, 'evaluation-result', null, 'evaluation', student.userId)
   const html = render(student, EvaluationDetail, { evaluationId: 'evaluation' })
-  assert.ok(html.includes('No evaluada'))
-  assert.ok(html.includes('no se generan calificaciones'))
-  assert.ok(!html.includes('Enviar evaluación'))
+  assert.ok(html.includes('Evaluación con calificación'))
+  assert.ok(html.includes('Enviar evaluación'))
+  assert.ok(html.includes('Enlace de mi calificación'))
   assert.ok(!html.includes('Editar evaluación'))
   assert.ok(!html.includes('Correcta'))
+})
+test('saved evaluation result shows the server score and disables another submission', () => {
+  seed(student, 'evaluation', evaluation, 'evaluation')
+  seed(student, 'evaluation-result', { evaluationId: 'evaluation', studentId: student.userId, tenantId: 'tenant', answers: [1], score: 0, correctAnswers: 0, totalQuestions: 1, submittedAt: course.createdAt }, 'evaluation', student.userId)
+  const html = render(student, EvaluationDetail, { evaluationId: 'evaluation' })
+  assert.ok(html.includes('Entrega registrada'))
+  assert.ok(html.includes('0%'))
+  assert.ok(!html.includes('Enviar evaluación'))
+  assert.ok(html.includes('disabled=""'))
+})
+test('a result lookup failure blocks submission instead of assuming no prior attempt', () => {
+  seed(student, 'evaluation', evaluation, 'evaluation')
+  const html = render(student, EvaluationDetail, { evaluationId: 'evaluation' })
+  assert.match(html, /disabled=""[^>]*>Enviar evaluación/)
+})
+test('an evaluation past its deadline disables student submission', () => {
+  seed(student, 'evaluation', { ...evaluation, fechaLimite: '2000-01-01T00:00:00Z' }, 'evaluation')
+  seed(student, 'evaluation-result', null, 'evaluation', student.userId)
+  const html = render(student, EvaluationDetail, { evaluationId: 'evaluation' })
+  assert.ok(html.includes('su fecha límite ya pasó'))
+  assert.match(html, /disabled=""[^>]*>Enviar evaluación/)
+})
+test('student can read a saved result even if the closed evaluation detail is NOT_FOUND', () => {
+  const entry = queryCache.entry([student.tenantId, student.userId, 'evaluation', 'evaluation'])
+  entry.snapshot = { ...entry.snapshot, status: 'error', error: new ApiError('NOT_FOUND', 'Evaluation not found') }
+  seed(student, 'evaluation-result', { evaluationId: 'evaluation', score: 100, correctAnswers: 1, totalQuestions: 1, submittedAt: course.createdAt }, 'evaluation', student.userId)
+  const html = render(student, EvaluationDetail, { evaluationId: 'evaluation' })
+  assert.ok(html.includes('100%'))
+  assert.ok(!html.includes('Enviar evaluación'))
+})
+test('teacher result view refuses another author even if a result is in cache', () => {
+  seed(teacher, 'evaluation', { ...evaluation, teacherId: 'another-teacher' }, 'evaluation')
+  seed(teacher, 'evaluation-result', { evaluationId: 'evaluation', score: 100, correctAnswers: 1, totalQuestions: 1, submittedAt: course.createdAt }, 'evaluation', student.userId)
+  const html = render(teacher, EvaluationResultLookup, { evaluationId: 'evaluation', studentId: student.userId })
+  assert.ok(html.includes('otro responsable'))
+  assert.ok(!html.includes('100%'))
+})
+test('missing result renders absence rather than a zero score', () => {
+  seed(student, 'evaluation-result', null, 'evaluation', student.userId)
+  const html = render(student, EvaluationResultLookup, { evaluationId: 'evaluation' })
+  assert.ok(html.includes('Todavía no hay una entrega registrada'))
+  assert.ok(!html.includes('quiz-score'))
 })
 test('student course detail checks membership before revealing materials', () => {
   seed(student, 'course', course, 'course')

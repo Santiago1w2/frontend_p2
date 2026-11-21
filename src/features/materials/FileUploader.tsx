@@ -1,9 +1,8 @@
 import { useEffect,useRef,useState } from 'react'
 import type { FormEvent } from 'react'
-import { uploadMaterial } from '../../services/MaterialService'
+import { resolveMaterialMime,uploadMaterial } from '../../services/MaterialService'
 import type { UploadPhase,UploadTask } from '../../services/MaterialService'
 import { allowedMimeTypes } from '../../types/lms'
-import type { MaterialMime } from '../../types/lms'
 import { session } from '../../lib/session'
 import { fileSize } from '../../lib/format'
 import { Button,FormField } from '../../components/ui/Controls'
@@ -29,13 +28,14 @@ export function FileUploader({ courseId,onSuccess }: { courseId: string; onSucce
     task.current={ uploaded: false }
     setTaskState({ uploaded: false })
     if(!selected) { setFile(null); return }
-    if(!(allowedMimeTypes as readonly string[]).includes(selected.type)) { setFile(null); setError(new Error('Tipo no permitido. Selecciona PDF, MP4, JPEG, PNG, ZIP o texto plano con un MIME reconocido.')); return }
+    if(!resolveMaterialMime(selected)) { setFile(null); setError(new Error('Tipo no permitido. Selecciona PDF, MP4, JPEG, PNG, ZIP o texto plano.')); return }
     setFile(selected)
     setTitle(selected.name.replace(/\.[^.]+$/,''))
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if(!file||!title.trim()||pending) return
+    const mimeType=file&&resolveMaterialMime(file)
+    if(!file||!mimeType||!title.trim()||pending) return
     const current=new AbortController()
     controller.current=current
     const signal=AbortSignal.any([current.signal,session.signal()])
@@ -43,7 +43,7 @@ export function FileUploader({ courseId,onSuccess }: { courseId: string; onSucce
     setError(null)
     setProgress(0)
     try {
-      await uploadMaterial({ courseId,title: title.trim(),file,mimeType: file.type as MaterialMime },task.current,nextPhase => { setPhase(nextPhase); setTaskState({ ...task.current }) },setProgress,signal)
+      await uploadMaterial({ courseId,title: title.trim(),file,mimeType },task.current,nextPhase => { setPhase(nextPhase); setTaskState({ ...task.current }) },setProgress,signal)
       if(!signal.aborted) { onSuccess(); setFile(null); setTitle(''); task.current={ uploaded: false }; if(input.current) input.current.value='' }
     } catch(error) { if(!signal.aborted) setError(error) }
     finally { setPending(false); setTaskState({ ...task.current }) }
@@ -62,7 +62,7 @@ export function FileUploader({ courseId,onSuccess }: { courseId: string; onSucce
       </span>
       <strong>{file? file.name:'Elige un archivo para compartir'}</strong>
       <span>{file? fileSize(file.size):'PDF, MP4, JPEG, PNG, ZIP o TXT'}</span>
-      <input ref={input} id="material-file" type="file" accept={allowedMimeTypes.join(',')} onChange={event => select(event.target.files?.[0])} disabled={pending||Boolean(taskState.contentId)} />
+      <input ref={input} id="material-file" type="file" accept={[...allowedMimeTypes,'.pdf','.mp4','.jpg','.jpeg','.png','.zip','.txt'].join(',')} onChange={event => select(event.target.files?.[0])} disabled={pending||Boolean(taskState.contentId)} />
     </label>
     {file&&<FormField id="material-title" label="Nombre del material">
       <input id="material-title" value={title} onChange={event => setTitle(event.target.value)} required disabled={pending||Boolean(taskState.contentId)} />

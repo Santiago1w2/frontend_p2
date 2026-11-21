@@ -2,7 +2,7 @@ import { mockHttp, success, businessError } from './setup.mjs'
 import { beforeEach, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { enrollmentCreate, enrollmentList, isEnrolled } from '../src/services/EnrollmentService.ts'
-import { uploadMaterial, putToS3, materialDownload } from '../src/services/MaterialService.ts'
+import { uploadMaterial, putToS3, materialDownload, resolveMaterialMime } from '../src/services/MaterialService.ts'
 import { session } from '../src/lib/session.ts'
 
 class MockXHR {
@@ -70,6 +70,8 @@ test('S3 upload registers, signs, PUTs exact MIME without Bearer, then confirms'
   assert.deepEqual(calls.map(call => call.url), ['/materials', '/materials/content/upload-url', '/materials/content/confirm'])
   assert.deepEqual(phases, ['registering', 'signing', 'uploading', 'confirming', 'complete'])
   assert.equal(JSON.parse(calls[0].data).sizeBytes, file.size)
+  assert.deepEqual(calls[1].params, { courseId: 'course' })
+  assert.deepEqual(calls[2].params, { courseId: 'course' })
   assert.equal(MockXHR.calls[0].method, 'PUT')
   assert.deepEqual(MockXHR.calls[0].headers, { 'Content-Type': 'application/pdf' })
   assert.deepEqual(progress, [100])
@@ -121,4 +123,37 @@ test('downloads request a new short-lived signed URL on every action', async () 
   const second = await materialDownload('content')
   assert.notEqual(first.downloadUrl, second.downloadUrl)
   assert.equal(calls.length, 2)
+})
+
+test('download lookup includes its course to read the latest material state', async () => {
+  const calls = mockHttp(() => success({ downloadUrl: 'https://s3.test.invalid/signed', expiresIn: 60 }))
+  await materialDownload('content', undefined, 'course')
+  assert.deepEqual(calls[0].params, { courseId: 'course' })
+})
+
+test('material MIME resolves Windows ZIP aliases and empty or generic browser types', () => {
+  for (const [name, type, expected] of [
+    ['notes.zip', 'application/x-zip-compressed', 'application/zip'],
+    ['notes.zip', 'application/x-zip', 'application/zip'],
+    ['NOTES.PDF', '', 'application/pdf'],
+    ['notes.txt', 'application/octet-stream', 'text/plain'],
+    ['image.jpeg', 'image/jpg', 'image/jpeg'],
+    ['notes.txt', 'text/plain;charset=utf-8', 'text/plain'],
+    ['clip.mp4', '', 'video/mp4'],
+    ['image.png', '', 'image/png'],
+  ]) assert.equal(resolveMaterialMime({ name, type }), expected)
+})
+
+test('material MIME rejects unsupported extensions and explicit unsupported types', () => {
+  assert.equal(resolveMaterialMime({ name: 'program.exe', type: '' }), null)
+  assert.equal(resolveMaterialMime({ name: 'page.pdf', type: 'text/html' }), null)
+  assert.equal(resolveMaterialMime({ name: 'notes.docx', type: 'application/octet-stream' }), null)
+})
+
+test('a Windows ZIP upload uses the same normalized MIME for registration and S3', async () => {
+  const zip = new File(['zip bytes'], 'notes.zip', { type: 'application/x-zip-compressed' })
+  const calls = mockHttp(config => success(config.url === '/materials' ? { contentId: 'content' } : config.url.endsWith('/upload-url') ? { uploadUrl: 'https://s3.test.invalid/signed' } : { contentId: 'content', uploadStatus: 'confirmed' }))
+  await uploadMaterial({ ...input, file: zip, mimeType: resolveMaterialMime(zip) }, { uploaded: false }, () => {}, () => {})
+  assert.equal(JSON.parse(calls[0].data).mimeType, 'application/zip')
+  assert.deepEqual(MockXHR.calls[0].headers, { 'Content-Type': 'application/zip' })
 })

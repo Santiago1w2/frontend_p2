@@ -40,6 +40,14 @@ export const queryCache = {
     entry.updatedAt = Date.now()
     emit(entry, { ...entry.snapshot, data: update(entry.snapshot.data), status: 'success', error: null, fetching: false })
   },
+  cancel(key: QueryKey) {
+    const entry = entries.get(JSON.stringify(key))
+    if (!entry?.promise) return
+    entry.controller?.abort()
+    entry.controller = undefined
+    entry.promise = undefined
+    emit(entry, { ...entry.snapshot, fetching: false, status: entry.snapshot.data === undefined ? 'idle' : 'success', error: null })
+  },
   invalidate(prefix: QueryKey) {
     entries.forEach(entry => {
       if (prefix.every((part, index) => JSON.stringify(part) === JSON.stringify(entry.key[index]))) {

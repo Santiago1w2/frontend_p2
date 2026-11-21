@@ -21,7 +21,7 @@ export default function EvaluationList({ courseId,editable=false }: { courseId: 
     <div className="section-heading">
       <div>
         <h2>Evaluaciones del curso</h2>
-        <p className="muted">{user.role==='student'? 'Consulta preguntas y practica sin calificación.':'Diseña preguntas que inviten a pensar.'}</p>
+        <p className="muted">{user.role==='student'? 'Responde las evaluaciones publicadas y consulta tu calificación.':'Diseña preguntas y consulta las calificaciones de tus estudiantes.'}</p>
       </div>
       {editable&&<Link className="button button-secondary" href={'/app/courses/'+encodeURIComponent(courseId)+'/evaluations/new'}><Icon name="plus" size={17} />Crear evaluación</Link>}
     </div>

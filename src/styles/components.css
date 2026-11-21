@@ -210,3 +210,9 @@ label.read-option:hover { border-color: var(--border-strong); }
 .login-help { display: flex; align-items: flex-start; gap: 9px; margin-top: 26px; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .login-help svg { margin-top: 2px; }
 .login-fineprint { position: absolute; bottom: 20px; color: var(--muted); font-size: 10px; }
+
+.quiz-result { margin-block: 20px; }
+.quiz-result h2, .quiz-result p { margin: 0; }
+.quiz-score { font-size: clamp(2.25rem, 6vw, 3.5rem); line-height: 1.15; color: var(--text); }
+.question-read:disabled .read-option { cursor: default; }
+.question-read:disabled input { cursor: default; }

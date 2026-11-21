@@ -1,8 +1,21 @@
 import { API_CONTENT } from '../api/api'
 import { ApiError } from '../api/errors'
 import type { Material, MaterialMime } from '../types/lms'
+import { allowedMimeTypes } from '../types/lms'
 export const materialList = (courseId: string, signal?: AbortSignal) => API_CONTENT.get<{ items: Material[] }>('/materials', { params: { courseId }, signal })
-export const materialDownload = (id: string, signal?: AbortSignal) => API_CONTENT.get<{ downloadUrl: string; expiresIn: number }>('/materials/' + encodeURIComponent(id) + '/download-url', { signal })
+export const materialDownload = (id: string, signal?: AbortSignal, courseId?: string) => API_CONTENT.get<{ downloadUrl: string; expiresIn: number }>('/materials/' + encodeURIComponent(id) + '/download-url', { signal, params: courseId ? { courseId } : undefined })
+
+const mimeAliases: Record<string, MaterialMime> = { 'application/x-zip-compressed': 'application/zip', 'application/x-zip': 'application/zip', 'image/jpg': 'image/jpeg' }
+const extensionMimes: Record<string, MaterialMime> = { pdf: 'application/pdf', mp4: 'video/mp4', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', zip: 'application/zip', txt: 'text/plain' }
+
+export function resolveMaterialMime(file: Pick<File, 'name' | 'type'>): MaterialMime | null {
+  const mimeType = file.type.split(';')[0].trim().toLowerCase()
+  if ((allowedMimeTypes as readonly string[]).includes(mimeType)) return mimeType as MaterialMime
+  if (Object.hasOwn(mimeAliases, mimeType)) return mimeAliases[mimeType]
+  if (mimeType && mimeType !== 'application/octet-stream') return null
+  const extension = /\.([^.]+)$/.exec(file.name)?.[1].toLowerCase() ?? ''
+  return Object.hasOwn(extensionMimes, extension) ? extensionMimes[extension] : null
+}
 
 export function putToS3(url: string, file: Blob, mimeType: MaterialMime, onProgress: (progress: number) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -44,7 +57,7 @@ export async function uploadMaterial(input: UploadInput, task: UploadTask, onPha
   if (!task.uploaded) {
     onPhase('signing')
     try {
-      const { uploadUrl } = await API_CONTENT.post<{ uploadUrl: string; expiresIn: number }>(path + '/upload-url', undefined, { signal })
+      const { uploadUrl } = await API_CONTENT.post<{ uploadUrl: string; expiresIn: number }>(path + '/upload-url', undefined, { signal, params: { courseId: input.courseId } })
       onPhase('uploading')
       await putToS3(uploadUrl, input.file, input.mimeType, onProgress, signal)
       task.uploaded = true
@@ -54,7 +67,7 @@ export async function uploadMaterial(input: UploadInput, task: UploadTask, onPha
     }
   }
   onPhase('confirming')
-  const result = await API_CONTENT.post<{ contentId: string; uploadStatus: 'confirmed' }>(path + '/confirm', undefined, { signal })
+  const result = await API_CONTENT.post<{ contentId: string; uploadStatus: 'confirmed' }>(path + '/confirm', undefined, { signal, params: { courseId: input.courseId } })
   onPhase('complete')
   return result
 }

@@ -8,6 +8,8 @@ const users = [
   { userId: 'USR-TEST-ADMIN', email: 'admin@example.test', role: 'tenant_admin' },
   { userId: 'USR-TEST-TEACHER', email: 'teacher@example.test', role: 'teacher' },
   { userId: 'USR-TEST-STUDENT', email: 'student@example.test', role: 'student' },
+  { userId: 'USR-TEST-STUDENT-002', email: 'student2@example.test', role: 'student' },
+  { userId: 'USR-TEST-STUDENT-003', email: 'student3@example.test', role: 'student' },
 ].map(user => ({ ...user, tenantId: 'CAMPUS_DE_PRUEBA', status: 'active', createdAt }))
 const courses = [
   { courseId: 'CRS-TEST-001', title: 'Diseño de sistemas distribuidos', description: 'De una idea a un sistema resiliente. Explora cómo se conectan los servicios, los datos y las personas.', status: 'published' },
@@ -18,11 +20,27 @@ const enrollments = [{ enrollmentId: 'ENR-TEST-001', courseId: courses[0].course
 const materials = [{ contentId: 'CNT-TEST-001', courseId: courses[0].courseId, uploadedBy: 'USR-TEST-TEACHER', title: 'Guía de arquitectura · Semana 1', mimeType: 'application/pdf', sizeBytes: 204800, uploadStatus: 'confirmed', createdAt }]
 const evaluations = [{ evaluationId: 'EVL-TEST-001', courseId: courses[0].courseId, tenantId: 'CAMPUS_DE_PRUEBA', teacherId: 'USR-TEST-TEACHER', title: 'Conceptos para conectar ideas', status: 'published', createdAt, fechaLimite: '2026-12-01T23:59:00Z', questions: Array.from({ length: 3 }, (_, index) => ({ questionId: 'Q' + index, text: ['¿Qué representa una frontera de servicio?', '¿Qué aporta una cola de mensajes?', '¿Por qué diseñar para fallos?'][index], options: ['Una decisión de diseño que separa responsabilidades', 'Una regla visual del navegador'], correctIndex: 0 })) }]
 const sessions = new Map()
+const quizResults = new Map()
+const lostSubmissionResponses = new Set()
+const submissionScenario = process.env.LMS_TEST_QUIZ_SCENARIO ?? 'normal'
 const uploaded = new Set()
+if (process.env.LMS_TEST_SEARCH_FIXTURES === '1') {
+  courses.push(
+    { ...courses[0], courseId: 'CRS-A-BCB2FDD0', title: 'MATE23' },
+    { ...courses[0], courseId: 'CRS-A-00042', title: 'Curso en preparación', status: 'draft' },
+    { ...courses[0], courseId: 'CRS-A-DEADC0DE', title: 'Curso de otro docente', teacherId: 'USR-OTHER-TEACHER' },
+  )
+  users.push(
+    { ...users[2], userId: 'USR-A-00299', email: 'student299@example.test' },
+    { ...users[1], userId: 'USR-A-ABCDEF12', email: 'teacher-new@example.test' },
+    { ...users[0], userId: 'USR-ADMIN-TENANT_A', email: 'admin-tenant@example.test' },
+  )
+  enrollments.push({ enrollmentId: 'ENR-EXACT-TEST', courseId: 'CRS-A-BCB2FDD0', studentId: users[2].userId, status: 'active', createdAt })
+}
 
 function paginated(items, query) {
-  const start = query.get('nextToken') === 'test-second-page' ? 2 : 0
-  return { items: items.slice(start, start + 2), nextToken: start + 2 < items.length ? 'test-second-page' : null }
+  const start = Number(query.get('nextToken')?.replace('test-page-', '') ?? 0)
+  return { items: items.slice(start, start + 2), nextToken: start + 2 < items.length ? `test-page-${start + 2}` : null }
 }
 function visibleEvaluation(evaluation, user) {
   return user.role === 'student' ? { ...evaluation, questions: evaluation.questions.map(({ correctIndex: _correctIndex, ...question }) => question) } : evaluation
@@ -65,6 +83,7 @@ const api = createHttpServer(async (request, response) => {
   if (resource === 'me') { send(user); return }
   if (resource === 'users') {
     if (user.role !== 'tenant_admin') { fail('FORBIDDEN', 'Only admins'); return }
+    if (process.env.LMS_TEST_SEARCH_FIXTURES === '1' && id === 'USR-A-EEEEEEEE') { response.writeHead(502, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: 'Simulated lookup failure' })); return }
     if (request.method === 'POST') {
       if (users.some(item => item.email === body.email)) { fail('CONFLICT', 'Email already exists'); return }
       const created = { userId: 'USR-TEST-' + randomUUID(), email: body.email, role: body.role, tenantId: user.tenantId, status: 'active', createdAt: new Date().toISOString() }
@@ -103,11 +122,38 @@ const api = createHttpServer(async (request, response) => {
     send({ items: materials.filter(item => item.courseId === url.searchParams.get('courseId') && item.uploadStatus === 'confirmed') }); return
   }
   if (resource === 'evaluations') {
-    if (request.method === 'POST') { const created = { ...body, evaluationId: 'EVL-TEST-' + randomUUID(), tenantId: user.tenantId, teacherId: user.userId, status: 'draft', createdAt: new Date().toISOString() }; evaluations.push(created); send(created); return }
     const evaluation = evaluations.find(item => item.evaluationId === id)
     if (id && !evaluation) { fail('NOT_FOUND', 'Evaluation not found'); return }
+    if (action === 'result' && request.method === 'GET') {
+      const studentId = user.role === 'student' ? user.userId : url.searchParams.get('studentId')
+      if (!studentId) { fail('INVALID_BODY', 'studentId query param is required'); return }
+      const saved = quizResults.get(id + ':' + studentId)
+      if (saved) send(saved); else fail('NOT_FOUND', 'Result not found')
+      return
+    }
+    if (action === 'submit' && request.method === 'POST') {
+      if (user.role !== 'student') { fail('FORBIDDEN', 'Only students can submit quizzes'); return }
+      if (evaluation.status !== 'published') { fail('NOT_FOUND', 'Evaluation not found'); return }
+      if (!enrollments.some(item => item.courseId === evaluation.courseId && item.studentId === user.userId && item.status === 'active')) { fail('FORBIDDEN', 'You are not enrolled in this course'); return }
+      const key = id + ':' + user.userId
+      if (quizResults.has(key)) { fail('CONFLICT', 'You have already submitted this evaluation'); return }
+      if (!Array.isArray(body.answers) || body.answers.length !== evaluation.questions.length) { fail('INVALID_BODY', 'Unexpected number of answers'); return }
+      // Match the current backend: date enforcement belongs to the client here.
+      const correctAnswers = evaluation.questions.filter((question, index) => body.answers[index] === question.correctIndex).length
+      const totalQuestions = evaluation.questions.length
+      const saved = { evaluationId: id, studentId: user.userId, tenantId: user.tenantId, answers: body.answers, correctAnswers, totalQuestions, score: Math.round(correctAnswers / totalQuestions * 10000) / 100, submittedAt: new Date().toISOString() }
+      quizResults.set(key, saved)
+      if (submissionScenario === 'saved-but-response-lost' && !lostSubmissionResponses.has(key)) {
+        lostSubmissionResponses.add(key)
+        response.writeHead(502, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: 'Simulated lost response after saving' }))
+        return
+      }
+      const { evaluationId, score, submittedAt } = saved
+      send({ evaluationId, score, correctAnswers, totalQuestions, submittedAt }); return
+    }
+    if (request.method === 'POST' && !id) { if (user.role === 'student') { fail('FORBIDDEN', 'Only admins and teachers'); return } const created = { ...body, evaluationId: 'EVL-TEST-' + randomUUID(), tenantId: user.tenantId, teacherId: user.userId, status: 'draft', createdAt: new Date().toISOString() }; evaluations.push(created); send(created); return }
     if (request.method === 'PATCH') { if (user.role !== 'tenant_admin' && (user.role !== 'teacher' || evaluation.teacherId !== user.userId)) fail('FORBIDDEN', 'Not owner'); else { Object.assign(evaluation, body); send(evaluation) } return }
-    if (id) { if (user.role === 'student' && (evaluation.status !== 'published' || !enrollments.some(item => item.courseId === evaluation.courseId && item.studentId === user.userId))) fail('FORBIDDEN', 'Not enrolled'); else send(visibleEvaluation(evaluation, user)); return }
+    if (id) { if (user.role === 'student' && evaluation.status !== 'published') fail('NOT_FOUND', 'Evaluation not found'); else if (user.role === 'student' && !enrollments.some(item => item.courseId === evaluation.courseId && item.studentId === user.userId)) fail('FORBIDDEN', 'Not enrolled'); else send(visibleEvaluation(evaluation, user)); return }
     send({ items: evaluations.filter(item => item.courseId === url.searchParams.get('courseId') && (user.role !== 'student' || item.status === 'published')).map(item => visibleEvaluation(item, user)) }); return
   }
   fail('NOT_FOUND', 'Unsupported test route')

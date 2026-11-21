@@ -18,6 +18,7 @@ import ProfilePage from './features/profile/ProfilePage'
 import EvaluationsPage from './features/evaluations/EvaluationsPage'
 import EvaluationDetail from './features/evaluations/EvaluationDetail'
 import EvaluationEditor from './features/evaluations/EvaluationEditor'
+import ResultsPage from './features/evaluations/EvaluationResults'
 
 function AppRoute({ path }: { path: string }) {
   const parts=path.split('/').filter(Boolean).map(part => { try { return decodeURIComponent(part) } catch { return part } })
@@ -26,6 +27,7 @@ function AppRoute({ path }: { path: string }) {
   if(parts.length===1&&parts[0]==='app') return <DashboardPage />
   if(resource==='my-courses'&&!id) return <CoursesPage mine />
   if(resource==='profile'&&!id) return <ProfilePage />
+  if(resource==='results'&&!id) return <ResultsPage />
   if(resource==='users') return <RoleGuard roles={['tenant_admin']}>
     {!id? <UsersPage />:!action? <UserDetail userId={id} />:<NotFound />}
   </RoleGuard>
@@ -47,6 +49,7 @@ function AppRoute({ path }: { path: string }) {
   }
   if(resource==='evaluations') {
     if(!id) return <EvaluationsPage />
+    if(action==='result') return <ResultsPage evaluationId={id} />
     if(action==='edit') return <RoleGuard roles={['tenant_admin','teacher']}>
       <EvaluationEditor evaluationId={id} />
     </RoleGuard>
