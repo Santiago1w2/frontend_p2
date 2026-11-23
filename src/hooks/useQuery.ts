@@ -55,10 +55,11 @@ export function usePaged<T>(key: QueryKey, loader: (cursor: string | undefined, 
     const scope = session.signal()
     const controller = new AbortController()
     moreController.current = controller
+    const revision = query.revision
     try {
       const page = await loader(cursor, AbortSignal.any([scope, controller.signal]))
-      if (!scope.aborted && !controller.signal.aborted) queryCache.update<Collection<T>>(key, previous => mergePage(previous ?? { items: [], nextToken: null, cursors: [] }, page, cursor))
-    } catch (error) { if (!scope.aborted && !controller.signal.aborted) setMoreError({ key: JSON.stringify(key), error }) }
+      if (!scope.aborted && !controller.signal.aborted && queryCache.entry(key).snapshot.revision === revision) queryCache.update<Collection<T>>(key, previous => mergePage(previous ?? { items: [], nextToken: null, cursors: [] }, page, cursor))
+    } catch (error) { if (!scope.aborted && !controller.signal.aborted && queryCache.entry(key).snapshot.revision === revision) setMoreError({ key: JSON.stringify(key), error }) }
     finally { setPending(false); lock.current = false }
   }
   return { ...query, items: query.data?.items ?? [], hasMore: Boolean(query.data?.nextToken), loadMore, loadingMore: pending, moreError: moreError?.key === JSON.stringify(key) ? moreError.error : null }

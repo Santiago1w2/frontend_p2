@@ -18,7 +18,7 @@ export class ApiClient {
     this.url = url
     this.transport = transport
   }
-  async request<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
+  async request<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
     const token = options.public ? '' : session.token()
     const scope = session.signal()
     const signals = [options.signal, options.public ? undefined : scope].filter((signal): signal is AbortSignal => Boolean(signal))
@@ -53,6 +53,7 @@ export class ApiClient {
   get<T>(path: string, options?: RequestOptions) { return this.request<T>('GET', path, undefined, options) }
   post<T>(path: string, body?: unknown, options?: RequestOptions) { return this.request<T>('POST', path, body, options) }
   patch<T>(path: string, body: unknown, options?: RequestOptions) { return this.request<T>('PATCH', path, body, options) }
+  delete<T>(path: string, options?: RequestOptions) { return this.request<T>('DELETE', path, undefined, options) }
 }
 
 export const API_USER = new ApiClient(import.meta.env.VITE_API_V1_USER)

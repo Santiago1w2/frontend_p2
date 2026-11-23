@@ -1,8 +1,9 @@
 import { API_CONTENT } from '../api/api'
 import { ApiError } from '../api/errors'
-import type { Material, MaterialMime } from '../types/lms'
+import type { DeletionResult, Material, MaterialMime } from '../types/lms'
 import { allowedMimeTypes } from '../types/lms'
 export const materialList = (courseId: string, signal?: AbortSignal) => API_CONTENT.get<{ items: Material[] }>('/materials', { params: { courseId }, signal })
+export const materialDelete = (id: string) => API_CONTENT.delete<DeletionResult & { contentId: string }>('/materials/' + encodeURIComponent(id))
 export const materialDownload = (id: string, signal?: AbortSignal, courseId?: string) => API_CONTENT.get<{ downloadUrl: string; expiresIn: number }>('/materials/' + encodeURIComponent(id) + '/download-url', { signal, params: courseId ? { courseId } : undefined })
 
 const mimeAliases: Record<string, MaterialMime> = { 'application/x-zip-compressed': 'application/zip', 'application/x-zip': 'application/zip', 'image/jpg': 'image/jpeg' }

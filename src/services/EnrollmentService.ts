@@ -1,6 +1,6 @@
 import { API_ENROLLMENT } from '../api/api'
 import { ApiError } from '../api/errors'
-import type { Enrollment, Page, PageParams } from '../types/lms'
+import type { DeletionResult, Enrollment, Page, PageParams } from '../types/lms'
 export type EnrollmentFilter = { courseId: string; studentId?: string } | { studentId: string; courseId?: string }
 export function enrollmentList(params: PageParams & EnrollmentFilter, signal?: AbortSignal) {
   if (!params.courseId?.trim() && !params.studentId?.trim()) throw new ApiError('INVALID_BODY', 'Selecciona un curso o estudiante antes de consultar.')
@@ -9,6 +9,7 @@ export function enrollmentList(params: PageParams & EnrollmentFilter, signal?: A
   return API_ENROLLMENT.get<Page<Enrollment>>('/enrollments', { params, signal }).then(page => ({ ...page, items: page.items.filter(item => (!params.courseId || item.courseId === params.courseId) && (!params.studentId || item.studentId === params.studentId)) }))
 }
 export const enrollmentCreate = (data: { courseId: string; studentId?: string }) => API_ENROLLMENT.post<Enrollment>('/enrollments', data)
+export const enrollmentDelete = (data: { courseId: string; studentId: string }) => API_ENROLLMENT.delete<DeletionResult & { courseId: string; studentId: string }>('/enrollments', { params: data })
 export async function isEnrolled(courseId: string, studentId: string, signal?: AbortSignal): Promise<boolean> {
   let nextToken: string | undefined
   const seen = new Set<string>()

@@ -58,6 +58,17 @@ export const queryCache = {
       }
     })
   },
+  reset(prefix: QueryKey) {
+    entries.forEach(entry => {
+      if (prefix.every((part, index) => JSON.stringify(part) === JSON.stringify(entry.key[index]))) {
+        entry.controller?.abort()
+        entry.controller = undefined
+        entry.promise = undefined
+        entry.updatedAt = 0
+        emit(entry, { error: null, status: 'idle', fetching: false, revision: entry.snapshot.revision + 1 })
+      }
+    })
+  },
   clear() {
     entries.forEach(entry => {
       entry.controller?.abort()

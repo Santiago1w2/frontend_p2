@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { enrollmentList,enrollmentCreate } from '../../services/EnrollmentService'
+import { enrollmentList,enrollmentCreate,enrollmentDelete } from '../../services/EnrollmentService'
+import { clearDeletedEnrollment } from '../../lib/deletions'
+import { DeleteButton } from '../../components/shared/DeleteButton'
 import type { EnrollmentFilter } from '../../services/EnrollmentService'
 import { useScope } from '../../hooks/useCourses'
 import { usePaged } from '../../hooks/useQuery'
@@ -105,6 +107,7 @@ export default function EnrollmentsPage() {
               <th>Curso</th>
               <th>Estado</th>
               <th>Fecha</th>
+              {user.role==='tenant_admin'&&<th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -119,6 +122,7 @@ export default function EnrollmentsPage() {
                 <span className="badge badge-published">{item.status==='active'? 'Activa':item.status}</span>
               </td>
               <td className="muted">{date(item.createdAt)}</td>
+              {user.role==='tenant_admin'&&<td><DeleteButton label="Eliminar matrícula" description={'Se retirará la matrícula del estudiante '+item.studentId+' en el curso '+item.courseId+'. Perderá el acceso que depende de esa matrícula. Sus entregas y calificaciones existentes se conservan.'} remove={() => enrollmentDelete({ courseId: item.courseId,studentId: item.studentId })} onDeleted={() => clearDeletedEnrollment(scope,item.courseId)} /></td>}
             </tr>)}
           </tbody>
         </table>

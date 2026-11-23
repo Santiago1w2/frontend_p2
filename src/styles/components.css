@@ -116,6 +116,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--background); }
 .material-copy p { margin-top: 7px; color: var(--muted); font-size: 11px; }
 .material-copy p > span, .evaluation-copy p > span { margin: 0 7px; color: var(--faint); }
 .download-button { font-size: 12px; }
+.material-actions { flex-shrink: 0; }
 .upload-panel { padding: 28px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); }
 .upload-panel h2 { font-size: 23px; }
 .upload-panel .section-heading > svg { color: var(--accent); }

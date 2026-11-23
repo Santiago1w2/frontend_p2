@@ -45,13 +45,13 @@ export function Dialog({ open,onClose,title,children,busy=false,className='' }: 
     {children}
   </dialog>
 }
-export function ConfirmDialog({ open,onClose,onConfirm,title,description,pending,error }: { open: boolean; onClose: () => void; onConfirm: () => void; title: string; description: string; pending?: boolean; error?: ReactNode }) {
+export function ConfirmDialog({ open,onClose,onConfirm,title,description,pending,error,confirmLabel='Confirmar',danger=false }: { open: boolean; onClose: () => void; onConfirm: () => void; title: string; description: string; pending?: boolean; error?: ReactNode; confirmLabel?: string; danger?: boolean }) {
   return <Dialog open={open} onClose={onClose} title={title} busy={pending}>
     <p className="muted">{description}</p>
     {error}
     <div className="form-actions">
       <Button variant="secondary" onClick={onClose} disabled={pending}>Cancelar</Button>
-      <Button onClick={onConfirm} loading={pending}>Confirmar</Button>
+      <Button onClick={onConfirm} loading={pending} variant={danger? 'danger':'primary'}>{confirmLabel}</Button>
     </div>
   </Dialog>
 }

@@ -1,6 +1,6 @@
 # Aurion · Frontend LMS
 
-Frontend React, TypeScript y Vite conectado a los cinco microservicios del proyecto. Consume los **23 endpoints HTTP** declarados en el backend local, incluidos envío de quizzes y consulta de calificaciones. La integración no modifica el backend ni sus contratos.
+Frontend React, TypeScript y Vite conectado a los cinco microservicios del proyecto. Consume los **28 endpoints HTTP** declarados en el backend local, incluidos envío de quizzes y consulta de calificaciones. La integración no modifica el backend ni sus contratos.
 
 ## Ejecutar
 
@@ -58,6 +58,11 @@ Las rutas siguientes son relativas a la base versionada de cada servicio. Todas 
 | Evaluaciones | `PATCH /evaluations/{evaluationId}` | Edición, publicación y cierre |
 | Evaluaciones | `POST /evaluations/{evaluationId}/submit` | Entrega del estudiante |
 | Evaluaciones | `GET /evaluations/{evaluationId}/result` | Resultado propio o consulta por `studentId` |
+| Usuarios | `DELETE /users/{userId}` | Eliminar otra cuenta del tenant, solo administrador |
+| Cursos | `DELETE /courses/{courseId}` | Eliminar curso, administrador o docente propietario |
+| Matrículas | `DELETE /enrollments?courseId=…&studentId=…` | Desmatricular, solo administrador |
+| Contenidos | `DELETE /materials/{contentId}` | Eliminar material, administrador o docente que lo subió |
+| Evaluaciones | `DELETE /evaluations/{evaluationId}` | Administrador; docente propietario solo en borrador |
 
 `ApiClient` desenvuelve `{data, requestId}` y rechaza `{error:{code,message}, requestId}`, aunque llegue con HTTP 200. Los errores conservan su referencia; un resultado ausente nunca se presenta como calificación cero. Los HTTP 401/403 del gateway limpian la sesión; un `FORBIDDEN` de negocio muestra el error sin cerrar una sesión válida.
 
@@ -138,9 +143,27 @@ Para matrícula, el estudiante envía solo `courseId`; el administrador añade `
 
 Flujo de subida: registro → URL firmada → PUT directo a S3, sin Bearer y con el MIME registrado → confirmación → actualización de biblioteca. Se admite PDF, MP4, JPEG, PNG, ZIP y TXT, incluyendo aliases MIME habituales de Windows. El progreso usa bytes reales reportados por XMLHttpRequest.
 
-`courseId` se envía al solicitar subida, confirmar y descargar, conforme al backend actual. La subida firmada dura 300 segundos y la descarga 60. El reintento en la misma vista conserva `contentId`; si ya subió, solo vuelve a confirmar. Cambiar archivo/página o recargar pierde el registro temporal. No hay endpoint para recuperar todos los pendientes ni para eliminarlos.
+`courseId` se envía al solicitar subida, confirmar y descargar, conforme al backend actual. La subida firmada dura 300 segundos y la descarga 60. El reintento en la misma vista conserva `contentId`; si ya subió, solo vuelve a confirmar. Cambiar archivo/página o recargar pierde el registro temporal. No hay endpoint para listar todos los pendientes. Un material cuyo contentId se conoce puede eliminarse mediante DELETE, aunque el listado de biblioteca solo devuelve confirmados.
 
 Para descargar, el frontend solicita una URL nueva cada vez y navega inmediatamente a `downloadUrl`. El backend usa metadatos de DynamoDB para ubicar el objeto y firma la descarga; el navegador obtiene el archivo de S3. No se guarda una URL permanente ni se reutiliza una firma en caché. Se presentan mensajes diferenciados para errores de acceso y verificación de S3.
+
+## Eliminaciones
+
+Todas las eliminaciones muestran una confirmación con el nombre o los IDs afectados. **Cancelar** no envía ninguna solicitud. **Eliminar definitivamente** envía un único DELETE autenticado, bloquea dobles clics y solo actualiza la interfaz cuando el envelope devuelve `deleted: true`. No hay reintentos automáticos de una eliminación. Los errores de negocio, incluso con HTTP 200, se muestran en el diálogo y conservan el registro en pantalla. Ante timeout, comprueba el estado antes de reintentar.
+
+| Acción en la interfaz | Regla del backend y efecto |
+| --- | --- |
+| **Eliminar usuario**, desde su detalle | Solo administrador y nunca su propia cuenta. Elimina el usuario y su lookup de email; no elimina sus matrículas ni revoca explícitamente todas sus sesiones. |
+| **Eliminar curso**, desde el detalle | Administrador o docente propietario, en cualquier estado. Solo elimina el curso: conserva matrículas, materiales, evaluaciones y sus archivos. |
+| **Eliminar matrícula**, desde la fila de Matrículas | Solo administrador. Envía `courseId` y `studentId` como query params, sin body. Retira la matrícula; conserva entregas y notas existentes. |
+| **Eliminar material**, desde la biblioteca | Administrador o docente cuyo ID coincide con `uploadedBy`, aunque no sea propietario del curso. El backend intenta borrar el objeto S3 si está confirmado y después borra sus metadatos. Si S3 falla, puede confirmar la eliminación de metadatos y conservar el archivo. |
+| **Eliminar evaluación**, desde su detalle | Administrador en cualquier estado; docente propietario únicamente con `status: draft`. Conserva los resultados de estudiantes ya guardados. |
+
+No se simula una eliminación en cascada. Las confirmaciones indican los registros que permanecerán. Después del éxito se reinician las consultas afectadas: listados, detalles, búsquedas exactas, bibliotecas y, al retirar matrículas, comprobaciones de acceso y Mis cursos. Las respuestas anteriores y páginas pendientes no pueden restaurar filas borradas en la caché. Los datos de otro usuario/tenant no se invalidan.
+
+Al eliminar un usuario, curso o evaluación se vuelve a su listado. Al eliminar un material o matrícula se refresca la vista actual. Los resultados de una evaluación eliminada pueden seguir consultándose por su enlace de calificación según el contrato actual; el backend no los elimina. La consulta docente de resultados continúa exigiendo que la evaluación exista y le pertenezca en la interfaz, por lo que el administrador es quien puede consultar por ID los resultados retenidos después de eliminarla.
+
+Las pruebas de eliminación usan únicamente fixtures HTTP locales. No se borraron datos en AWS. Para usar estas acciones en producción deben estar desplegados los cinco endpoints DELETE y su configuración CORS correspondiente; esta adaptación no modifica ni despliega el backend.
 
 ## Sesión y caché
 
@@ -162,7 +185,7 @@ npm run build
 
 `npm test` verifica contratos, envelope, errores de gateway y negocio, sesiones, permisos de interfaz, cursores, matrícula, publicación, subida S3, validación del quiz, recuperación de entregas y resultados. La prueba de CloudFormation usa la plantilla real de la raíz, `amplify-frontend.yaml`.
 
-`npm run test:browser` ejecuta tres suites con Chrome/Edge sin interfaz y perfiles/puertos temporales: búsquedas, filtros y matrículas existentes; consultas directas por ID con comprobación de que no recorren listados, filtros y actualización de matrículas; y evaluación, entrega, recarga, consulta docente/admin, cierre, aislamiento entre usuarios y recuperación de una respuesta perdida después de guardar. `LMS_TEST_BROWSER` permite indicar el ejecutable Chromium. El navegador y Axios reales se conectan solo a fixtures HTTP locales; no se certifican AWS, IAM ni CORS real.
+`npm run test:browser` ejecuta cuatro suites con Chrome/Edge sin interfaz y perfiles/puertos temporales: búsquedas, filtros y matrículas existentes; consultas directas por ID con comprobación de que no recorren listados, filtros y actualización de matrículas; y evaluación, entrega, recarga, consulta docente/admin, cierre, aislamiento entre usuarios y recuperación de una respuesta perdida después de guardar; y eliminaciones con permisos, confirmación, cancelación, fallo de negocio, doble clic y actualización de caché. `LMS_TEST_BROWSER` permite indicar el ejecutable Chromium. El navegador y Axios reales se conectan solo a fixtures HTTP locales; no se certifican AWS, IAM ni CORS real.
 
 Para inspección interactiva aislada:
 
@@ -182,7 +205,7 @@ La plantilla compila con `npm run build`; ejecuta también la suite y lint antes
 
 ## Límites del contrato conservado
 
-El frontend cubre los 23 endpoints existentes. No hay rutas para borrar cursos/materiales, desmatricular, editar/desactivar usuarios, cambiar/restablecer contraseña, desbloquear cuentas ni gestionar varios intentos. No se crean llamadas a endpoints inexistentes.
+El frontend cubre los 28 endpoints existentes, incluidas cinco eliminaciones. No hay rutas para editar/desactivar usuarios, cambiar/restablecer contraseña, desbloquear cuentas ni gestionar varios intentos. No se crean llamadas a endpoints inexistentes.
 
 Materiales y evaluaciones devuelven `items` sin cursor; el frontend muestra lo recibido y no puede recuperar páginas que el backend no expone. El bloqueo de login tras cinco fallos no tiene recuperación desde la API. La interfaz no corrige permisos del backend ni la configuración de cuentas AWS: esos elementos permanecen tal como están.
 

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '../../hooks/useQuery'
 import { useScope } from '../../hooks/useCourses'
-import { materialList,materialDownload } from '../../services/MaterialService'
+import { materialList,materialDownload,materialDelete } from '../../services/MaterialService'
+import { useUser } from '../../context/AuthContext'
+import { canManage } from '../../lib/permissions'
+import { clearDeletedMaterial } from '../../lib/deletions'
+import { DeleteButton } from '../../components/shared/DeleteButton'
 import { fileSize,date } from '../../lib/format'
 import { queryCache } from '../../lib/queryCache'
 import { session } from '../../lib/session'
@@ -15,6 +19,7 @@ import { FileUploader } from './FileUploader'
 function mimeIcon(type: string): IconName { return type.startsWith('video/')? 'video':type.startsWith('image/')? 'image':type==='application/zip'? 'archive':'file' }
 export default function MaterialsPanel({ courseId,editable }: { courseId: string; editable: boolean }) {
   const scope=useScope()
+  const user=useUser()
   const notify=useToast()
   const query=useQuery([...scope,'materials',courseId],signal => materialList(courseId,signal))
   const [upload,setUpload]=useState(false)
@@ -60,10 +65,12 @@ export default function MaterialsPanel({ courseId,editable }: { courseId: string
             {date(item.confirmedAt??item.createdAt)}
           </p>
         </div>
-        <Button variant="ghost" className="download-button" loading={downloading===item.contentId} disabled={Boolean(downloading)&&downloading!==item.contentId} onClick={() => void download(item.contentId)} aria-label={'Descargar '+item.title}>
+        <div className="material-actions button-group"><Button variant="ghost" className="download-button" loading={downloading===item.contentId} disabled={Boolean(downloading)&&downloading!==item.contentId} onClick={() => void download(item.contentId)} aria-label={'Descargar '+item.title}>
           <Icon name="download" size={18} />
           <span>Descargar</span>
         </Button>
+        {canManage(user,item.uploadedBy)&&<DeleteButton label="Eliminar material" description={'Se eliminará '+item.title+' ('+item.contentId+'). El sistema también intentará borrar el archivo almacenado. Esta acción no se puede deshacer.'} remove={() => materialDelete(item.contentId)} onDeleted={() => clearDeletedMaterial(scope,courseId)} />}
+        </div>
       </article>)}
     </div>:!query.error&&<EmptyState icon="file" title="Un estante por llenar" description={editable? 'Comparte el primer material y dale forma al aprendizaje.':'Los materiales confirmados aparecerán aquí cuando el docente los comparta.'} action={editable&&!upload? <Button variant="secondary" onClick={() => setUpload(true)}>Subir el primer material</Button>:undefined} />}
   </section>

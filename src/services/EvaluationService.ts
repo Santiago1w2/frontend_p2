@@ -1,6 +1,6 @@
 import { API_EVALUATION } from '../api/api'
 import { ApiError } from '../api/errors'
-import type { Evaluation, EvaluationInput, EvaluationPatch, EvaluationResult, QuizSubmission, QuizSubmissionResult } from '../types/lms'
+import type { DeletionResult, Evaluation, EvaluationInput, EvaluationPatch, EvaluationResult, QuizSubmission, QuizSubmissionResult } from '../types/lms'
 
 // Older records and Bruno requests may omit questionId or repeat it. Answers are
 // positional in the API; local identities must never merge two question controls.
@@ -24,6 +24,7 @@ export async function evaluationList(courseId: string, signal?: AbortSignal) {
 export const evaluationFind = async (id: string, signal?: AbortSignal) => normalizeEvaluation(await API_EVALUATION.get<Evaluation>('/evaluations/' + encodeURIComponent(id), { signal }))
 export const evaluationCreate = async (data: EvaluationInput) => normalizeEvaluation(await API_EVALUATION.post<Evaluation>('/evaluations', data))
 export const evaluationPatch = async (id: string, data: EvaluationPatch) => normalizeEvaluation(await API_EVALUATION.patch<Evaluation>('/evaluations/' + encodeURIComponent(id), data))
+export const evaluationDelete = (id: string) => API_EVALUATION.delete<DeletionResult & { evaluationId: string }>('/evaluations/' + encodeURIComponent(id))
 export const evaluationSubmit = (id: string, data: QuizSubmission, signal?: AbortSignal) => API_EVALUATION.post<QuizSubmissionResult>('/evaluations/' + encodeURIComponent(id) + '/submit', data, { signal })
 export const evaluationResult = (id: string, studentId?: string, signal?: AbortSignal) => API_EVALUATION.get<EvaluationResult>('/evaluations/' + encodeURIComponent(id) + '/result', { params: studentId ? { studentId } : undefined, signal })
 export async function evaluationResultOrNull(id: string, studentId?: string, signal?: AbortSignal): Promise<EvaluationResult | null> {

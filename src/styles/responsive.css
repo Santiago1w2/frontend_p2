@@ -173,7 +173,8 @@
   .course-info dl > div { margin-block: 14px; }
   .overview-links { flex-direction: column; align-items: flex-start; }
   .material-list { padding-inline: 18px; }
-  .material-row { gap: 12px; padding-block: 19px; }
+  .material-row { flex-wrap: wrap; gap: 12px; padding-block: 19px; }
+  .material-actions { width: 100%; justify-content: flex-end; }
   .material-icon { width: 39px; height: 45px; border-radius: 11px; }
   .download-button { min-width: 44px; padding: 10px; }
   .download-button > span:not(.spinner) { display: none; }

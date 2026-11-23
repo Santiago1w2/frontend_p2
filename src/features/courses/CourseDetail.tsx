@@ -4,6 +4,10 @@ import { useCourse,useScope } from '../../hooks/useCourses'
 import { useQuery } from '../../hooks/useQuery'
 import { useAction } from '../../hooks/useAction'
 import { isEnrolled,enrollmentCreate } from '../../services/EnrollmentService'
+import { courseDelete } from '../../services/CourseService'
+import { clearDeletedCourse } from '../../lib/deletions'
+import { navigate } from '../../lib/navigation'
+import { DeleteButton } from '../../components/shared/DeleteButton'
 import { canManage } from '../../lib/permissions'
 import { queryCache } from '../../lib/queryCache'
 import { date,courseTone } from '../../lib/format'
@@ -52,6 +56,7 @@ export default function CourseDetail({ courseId,section='overview' }: { courseId
       <span>Creado el {date(course.createdAt)}</span>
       {editable&&<Link href={'/app/enrollments?courseId='+encodeURIComponent(courseId)}>Ver estudiantes <Icon name="arrow" size={15} /></Link>}
     </div>
+    {editable&&<div className="button-group"><DeleteButton label="Eliminar curso" description={'Se eliminará '+course.title+' ('+courseId+'). Las matrículas, materiales y evaluaciones asociados se conservan. Esta acción no se puede deshacer.'} remove={() => courseDelete(courseId)} onDeleted={() => { navigate(user.role==='teacher'? '/app/my-courses':'/app/courses'); clearDeletedCourse(scope,courseId) }} /></div>}
     {editable&&course.status==='draft'&&<div className="notice">Este curso está en borrador. Para mostrarlo en el catálogo de estudiantes de tu campus, abre Editar curso, selecciona Estado: Publicado y guarda los cambios. <Link href={root+'/edit'}>Editar curso</Link></div>}
     <ErrorState error={enroll.error} compact />
     <ErrorState error={membership.error} retry={() => void membership.refetch()} />

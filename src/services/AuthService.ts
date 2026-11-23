@@ -1,7 +1,7 @@
 import { API_USER } from '../api/api'
 import { ApiError } from '../api/errors'
 import type { LoginResponse, Role, User, UserCreateRequest, UserCredentials } from '../types/User'
-import type { Page, PageParams } from '../types/lms'
+import type { DeletionResult, Page, PageParams } from '../types/lms'
 import { session } from '../lib/session'
 export const login = (credentials: UserCredentials, signal?: AbortSignal) => API_USER.post<LoginResponse>('/auth/login', credentials, { public: true, signal })
 export const logout = () => API_USER.post<Record<string, never>>('/auth/logout')
@@ -30,3 +30,4 @@ export async function userListByRole(role: UserRoleFilter, params: PageParams = 
   }
 }
 export const userFindId = (id: string, signal?: AbortSignal) => API_USER.get<User>('/users/' + encodeURIComponent(id), { signal })
+export const userDelete = (id: string) => API_USER.delete<DeletionResult & { userId: string }>('/users/' + encodeURIComponent(id))

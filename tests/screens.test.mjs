@@ -12,6 +12,8 @@ import CoursesPage from '../src/features/courses/CoursesPage.tsx'
 import EvaluationDetail from '../src/features/evaluations/EvaluationDetail.tsx'
 import { EvaluationResultLookup } from '../src/features/evaluations/EvaluationResults.tsx'
 import { ApiError } from '../src/api/errors.ts'
+import { UserDetail } from '../src/features/users/UsersPage.tsx'
+import MaterialsPanel from '../src/features/materials/MaterialsPanel.tsx'
 
 const student = { userId: 'student', tenantId: 'tenant', email: 'student@example.test', role: 'student', status: 'active' }
 const teacher = { ...student, userId: 'teacher', role: 'teacher' }
@@ -21,6 +23,40 @@ const evaluation = { evaluationId: 'evaluation', courseId: 'course', teacherId: 
 beforeEach(() => queryCache.clear())
 function seed(user, name, data, ...rest) { queryCache.update([user.tenantId, user.userId, name, ...rest], () => data) }
 function render(user, component, props) { return renderToStaticMarkup(createElement(AuthContext.Provider, { value: { user, checking: false, busy: false, error: null } }, createElement(component, props))) }
+
+test('user deletion is offered to admins for another account but never for their own account', () => {
+  seed(admin, 'user', student, student.userId)
+  assert.ok(render(admin, UserDetail, { userId: student.userId }).includes('Eliminar usuario'))
+  seed(admin, 'user', admin, admin.userId)
+  assert.ok(!render(admin, UserDetail, { userId: admin.userId }).includes('Eliminar usuario'))
+  seed(teacher, 'user', student, student.userId)
+  assert.ok(!render(teacher, UserDetail, { userId: student.userId }).includes('Eliminar usuario'))
+})
+test('material deletion follows uploadedBy even when course editing is unavailable', () => {
+  const material = { contentId: 'material', courseId: 'course', uploadedBy: teacher.userId, title: 'Own upload', mimeType: 'text/plain', sizeBytes: 10, createdAt: course.createdAt }
+  seed(teacher, 'materials', { items: [material, { ...material, contentId: 'other', uploadedBy: 'other-teacher' }] }, 'course')
+  const html = render(teacher, MaterialsPanel, { courseId: 'course', editable: false })
+  assert.equal((html.match(/Eliminar material/g) ?? []).length, 1)
+  seed(student, 'materials', { items: [material] }, 'course')
+  assert.ok(!render(student, MaterialsPanel, { courseId: 'course', editable: false }).includes('Eliminar material'))
+})
+test('teachers can delete only owned draft evaluations while admins can delete published evaluations', () => {
+  for (const status of ['draft', 'published', 'closed']) {
+    seed(teacher, 'evaluation', { ...evaluation, status }, 'evaluation')
+    assert.equal(render(teacher, EvaluationDetail, { evaluationId: 'evaluation' }).includes('Eliminar evaluación'), status === 'draft')
+  }
+  seed(admin, 'evaluation', evaluation, 'evaluation')
+  assert.ok(render(admin, EvaluationDetail, { evaluationId: 'evaluation' }).includes('Eliminar evaluación'))
+})
+test('course delete controls are hidden for students and other teachers', () => {
+  seed(student, 'course', course, course.courseId)
+  seed(student, 'membership', true, course.courseId)
+  assert.ok(!render(student, CourseDetail, { courseId: course.courseId }).includes('Eliminar curso'))
+  seed(teacher, 'course', { ...course, teacherId: 'other' }, course.courseId)
+  assert.ok(!render(teacher, CourseDetail, { courseId: course.courseId }).includes('Eliminar curso'))
+  seed(admin, 'course', course, course.courseId)
+  assert.ok(render(admin, CourseDetail, { courseId: course.courseId }).includes('Eliminar curso'))
+})
 test('student evaluation offers a real submission without exposing correct answers', () => {
   seed(student, 'evaluation', evaluation, 'evaluation')
   seed(student, 'evaluation-result', null, 'evaluation', student.userId)

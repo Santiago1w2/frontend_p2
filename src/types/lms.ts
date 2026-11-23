@@ -1,5 +1,6 @@
 export interface Page<T> { items: T[]; nextToken: string | null }
 export interface PageParams { limit?: number; nextToken?: string }
+export interface DeletionResult { deleted: boolean }
 export interface Enrollment {
   enrollmentId: string
   courseId: string

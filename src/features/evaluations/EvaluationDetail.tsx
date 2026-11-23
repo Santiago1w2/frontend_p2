@@ -1,9 +1,12 @@
 import { useUser } from '../../context/AuthContext'
 import { useScope } from '../../hooks/useCourses'
 import { useQuery } from '../../hooks/useQuery'
-import { evaluationFind } from '../../services/EvaluationService'
+import { evaluationFind,evaluationDelete } from '../../services/EvaluationService'
 import { date } from '../../lib/format'
-import { canManage } from '../../lib/permissions'
+import { canManage,canDeleteEvaluation } from '../../lib/permissions'
+import { clearDeletedEvaluation } from '../../lib/deletions'
+import { navigate } from '../../lib/navigation'
+import { DeleteButton } from '../../components/shared/DeleteButton'
 import { Link } from '../../lib/router'
 import { PageHeader } from '../../components/shared/PageHeader'
 import { ErrorState,LoadingSkeleton } from '../../components/shared/States'
@@ -32,6 +35,8 @@ export default function EvaluationDetail({ evaluationId }: { evaluationId: strin
       <Link href={'/app/courses/'+encodeURIComponent(evaluation.courseId)+'/evaluations'}>Volver al curso <Icon name="arrow" size={15} /></Link>
     </div>
     <p className="scope-note">ID de la evaluación: {evaluationId}</p>
+    {canDeleteEvaluation(user,evaluation)&&<div className="button-group"><DeleteButton label="Eliminar evaluación" description={'Se eliminará '+evaluation.title+' ('+evaluationId+'). Las calificaciones existentes se conservan. Esta acción no se puede deshacer.'} remove={() => evaluationDelete(evaluationId)} onDeleted={() => { navigate('/app/courses/'+encodeURIComponent(evaluation.courseId)+'/evaluations'); clearDeletedEvaluation(scope,evaluation.courseId,evaluationId) }} /></div>}
+    {user.role==='teacher'&&evaluation.teacherId===user.userId&&evaluation.status!=='draft'&&<p className="scope-note">Solo puedes eliminar tus evaluaciones en borrador. Para una evaluación publicada o cerrada, solicita la eliminación al administrador.</p>}
     {student?<StudentQuiz key={evaluationId} evaluation={evaluation} />:<div className="question-reader stack">
       {evaluation.questions.map((question,index) => <fieldset key={question.questionId} className="question-read">
         <legend>

@@ -24,7 +24,7 @@ async function until(check, label) {
   throw new Error('Timed out: ' + label)
 }
 
-export async function withFixtureBrowser(run, { scenario = 'normal', searchFixtures = false } = {}) {
+export async function withFixtureBrowser(run, { scenario = 'normal', searchFixtures = false, deletionScenario = 'normal' } = {}) {
   const cwd = fileURLToPath(new URL('../', import.meta.url))
   const browserPath = process.env.LMS_TEST_BROWSER ?? [
     'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -38,7 +38,7 @@ export async function withFixtureBrowser(run, { scenario = 'normal', searchFixtu
   const source = (await readFile(new URL('./preview-server.mjs', import.meta.url), 'utf8'))
     .replaceAll('4173', String(webPort)).replaceAll('4174', String(apiPort))
   let fixtureOutput = ''
-  const fixtures = spawn(process.execPath, ['--input-type=module', '--eval', source], { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LMS_TEST_QUIZ_SCENARIO: scenario, LMS_TEST_SEARCH_FIXTURES: searchFixtures ? '1' : '0' } })
+  const fixtures = spawn(process.execPath, ['--input-type=module', '--eval', source], { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LMS_TEST_QUIZ_SCENARIO: scenario, LMS_TEST_SEARCH_FIXTURES: searchFixtures ? '1' : '0', LMS_TEST_DELETE_SCENARIO: deletionScenario } })
   fixtures.stdout.on('data', data => { fixtureOutput += data })
   fixtures.stderr.on('data', data => { fixtureOutput += data })
   const profile = await mkdtemp(join(tmpdir(), 'lms-evaluation-'))

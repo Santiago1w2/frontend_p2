@@ -24,6 +24,7 @@ const quizResults = new Map()
 const lostSubmissionResponses = new Set()
 const submissionScenario = process.env.LMS_TEST_QUIZ_SCENARIO ?? 'normal'
 const uploaded = new Set()
+const deleteFailures = new Set()
 if (process.env.LMS_TEST_SEARCH_FIXTURES === '1') {
   courses.push(
     { ...courses[0], courseId: 'CRS-A-BCB2FDD0', title: 'MATE23' },
@@ -48,7 +49,7 @@ function visibleEvaluation(evaluation, user) {
 const api = createHttpServer(async (request, response) => {
   response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:4173')
   response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, OPTIONS')
+  response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS')
   if (request.method === 'OPTIONS') { response.writeHead(204).end(); return }
   const url = new URL(request.url, apiOrigin)
   const parts = url.pathname.split('/').filter(Boolean)
@@ -79,6 +80,9 @@ const api = createHttpServer(async (request, response) => {
   const token = (request.headers.authorization ?? '').replace(/^Bearer /, '')
   const user = sessions.get(token)
   if (!user) { response.writeHead(403, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: 'Invalid local session' })); return }
+  if (request.method === 'DELETE' && process.env.LMS_TEST_DELETE_SCENARIO === 'fail-first-user' && resource === 'users' && id === 'USR-TEST-STUDENT-003' && !deleteFailures.has(id)) {
+    deleteFailures.add(id); fail('FORBIDDEN', 'Simulated permission failure'); return
+  }
   if (resource === 'auth' && id === 'logout') { sessions.delete(token); send({}); return }
   if (resource === 'me') { send(user); return }
   if (resource === 'users') {
@@ -91,17 +95,35 @@ const api = createHttpServer(async (request, response) => {
       send({ userId: created.userId, email: created.email, role: created.role }); return
     }
     const item = users.find(person => person.userId === id)
+    if (request.method === 'DELETE') {
+      if (id === user.userId) { fail('FORBIDDEN', 'You cannot delete your own account'); return }
+      if (!item) { fail('NOT_FOUND', 'User not found'); return }
+      users.splice(users.indexOf(item), 1); send({ userId: id, deleted: true }); return
+    }
     if (id) { if (item) send(item); else fail('NOT_FOUND', 'User not found'); return }
     send(paginated(users, url.searchParams)); return
   }
   if (resource === 'courses') {
     if (request.method === 'POST') { if (user.role === 'student') { fail('FORBIDDEN', 'Students cannot create courses'); return } const created = { ...body, courseId: 'CRS-TEST-' + randomUUID(), tenantId: user.tenantId, teacherId: user.userId, status: 'draft', createdAt: new Date().toISOString() }; courses.push(created); send(created); return }
     const course = courses.find(item => item.courseId === id)
+    if (request.method === 'DELETE') {
+      if (user.role !== 'tenant_admin' && (user.role !== 'teacher' || course?.teacherId !== user.userId)) { fail('FORBIDDEN', 'Not owner'); return }
+      if (!course) { fail('NOT_FOUND', 'Course not found'); return }
+      courses.splice(courses.indexOf(course), 1); send({ courseId: id, deleted: true }); return
+    }
     if (request.method === 'PATCH') { if (!course) fail('NOT_FOUND', 'Course not found'); else if (user.role !== 'tenant_admin' && (user.role !== 'teacher' || course.teacherId !== user.userId)) fail('FORBIDDEN', 'Not owner'); else { Object.assign(course, body, { updatedAt: new Date().toISOString() }); send(course) } return }
     if (id) { if (course) send(course); else fail('NOT_FOUND', 'Course not found'); return }
     send(paginated(courses.filter(item => !url.searchParams.get('teacherId') || item.teacherId === url.searchParams.get('teacherId')), url.searchParams)); return
   }
   if (resource === 'enrollments') {
+    if (request.method === 'DELETE') {
+      if (user.role !== 'tenant_admin') { fail('FORBIDDEN', 'Only admins can delete enrollments'); return }
+      const courseId = url.searchParams.get('courseId'), studentId = url.searchParams.get('studentId')
+      if (!courseId || !studentId) { fail('INVALID_BODY', 'courseId and studentId query params are required'); return }
+      const index = enrollments.findIndex(item => item.courseId === courseId && item.studentId === studentId)
+      if (index < 0) { fail('NOT_FOUND', 'Enrollment not found'); return }
+      enrollments.splice(index, 1); send({ courseId, studentId, deleted: true }); return
+    }
     if (request.method === 'POST') {
       const studentId = user.role === 'student' ? user.userId : body.studentId
       if (user.role === 'teacher') { fail('FORBIDDEN', 'Teachers cannot enroll'); return }
@@ -116,6 +138,10 @@ const api = createHttpServer(async (request, response) => {
     if (request.method === 'POST' && !id) { const created = { ...body, contentId: 'CNT-TEST-' + randomUUID(), uploadedBy: user.userId, uploadStatus: 'pending', createdAt: new Date().toISOString() }; materials.push(created); send({ contentId: created.contentId, uploadStatus: 'pending' }); return }
     const material = materials.find(item => item.contentId === id)
     if (id && !material) { fail('NOT_FOUND', 'Content not found'); return }
+    if (request.method === 'DELETE') {
+      if (user.role !== 'tenant_admin' && (user.role !== 'teacher' || material.uploadedBy !== user.userId)) { fail('FORBIDDEN', 'Not uploader'); return }
+      uploaded.delete(id); materials.splice(materials.indexOf(material), 1); send({ contentId: id, deleted: true }); return
+    }
     if (action === 'upload-url') { send({ uploadUrl: apiOrigin + '/signed-put/' + id, expiresIn: 300 }); return }
     if (action === 'confirm') { if (!uploaded.has(id)) fail('BAD_REQUEST', 'File not uploaded'); else { material.uploadStatus = 'confirmed'; material.confirmedAt = new Date().toISOString(); send({ contentId: id, uploadStatus: 'confirmed' }) } return }
     if (action === 'download-url') { send({ downloadUrl: apiOrigin + '/download/' + id, expiresIn: 60 }); return }
@@ -123,7 +149,12 @@ const api = createHttpServer(async (request, response) => {
   }
   if (resource === 'evaluations') {
     const evaluation = evaluations.find(item => item.evaluationId === id)
-    if (id && !evaluation) { fail('NOT_FOUND', 'Evaluation not found'); return }
+    if (id && !evaluation && action !== 'result') { fail('NOT_FOUND', 'Evaluation not found'); return }
+    if (request.method === 'DELETE') {
+      if (user.role !== 'tenant_admin' && (user.role !== 'teacher' || evaluation.teacherId !== user.userId)) { fail('FORBIDDEN', 'Not owner'); return }
+      if (user.role === 'teacher' && evaluation.status !== 'draft') { fail('CONFLICT', 'Teachers can only delete draft evaluations'); return }
+      evaluations.splice(evaluations.indexOf(evaluation), 1); send({ evaluationId: id, deleted: true }); return
+    }
     if (action === 'result' && request.method === 'GET') {
       const studentId = user.role === 'student' ? user.userId : url.searchParams.get('studentId')
       if (!studentId) { fail('INVALID_BODY', 'studentId query param is required'); return }

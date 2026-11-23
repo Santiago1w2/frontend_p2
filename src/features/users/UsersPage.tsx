@@ -5,11 +5,15 @@ import { usePagedSearch } from '../../hooks/usePagedSearch'
 import { useExactSearch } from '../../hooks/useExactSearch'
 import { exactEntityId } from '../../lib/entitySearch'
 import { useScope } from '../../hooks/useCourses'
+import { useUser } from '../../context/AuthContext'
 import { useAction } from '../../hooks/useAction'
-import { userListByRole,userCreate,userFindId } from '../../services/AuthService'
+import { userListByRole,userCreate,userFindId,userDelete } from '../../services/AuthService'
 import type { UserRoleFilter } from '../../services/AuthService'
 import type { Role,UserCreateRequest } from '../../types/User'
-import { roleLabels } from '../../lib/permissions'
+import { roleLabels,canDeleteUser } from '../../lib/permissions'
+import { clearDeletedUser } from '../../lib/deletions'
+import { navigate } from '../../lib/navigation'
+import { DeleteButton } from '../../components/shared/DeleteButton'
 import { date } from '../../lib/format'
 import { queryCache } from '../../lib/queryCache'
 import { Link } from '../../lib/router'
@@ -130,6 +134,7 @@ export default function UsersPage() {
 }
 export function UserDetail({ userId }: { userId: string }) {
   const scope=useScope()
+  const caller=useUser()
   const query=useQuery([...scope,'user',userId],signal => userFindId(userId,signal))
   if(query.isLoading) return <LoadingSkeleton />
   if(query.error) return <ErrorState error={query.error} retry={() => void query.refetch()} />
@@ -137,6 +142,7 @@ export function UserDetail({ userId }: { userId: string }) {
   if(!user) return null
   return <>
     <PageHeader eyebrow="PERSONAS DEL CAMPUS" title={user.email.split('@')[0]} description={user.email} action={user.role==='student'&&<Link className="button button-secondary" href={'/app/enrollments?studentId='+encodeURIComponent(user.userId)}>Ver matrículas <Icon name="arrow" size={17} /></Link>} />
+    {canDeleteUser(caller,user.userId)&&<div className="button-group"><DeleteButton label="Eliminar usuario" description={'Se eliminará la cuenta '+user.email+' ('+user.userId+'). Sus matrículas y registros relacionados se conservan. Esta acción no se puede deshacer.'} remove={() => userDelete(user.userId)} onDeleted={() => { navigate('/app/users'); clearDeletedUser(scope,user.userId) }} /></div>}
     <section className="form-panel">
       <dl className="detail-grid">
         {[['Identificador',user.userId],['Correo',user.email],['Rol',roleLabels[user.role]],['Estado',user.status],['Campus',user.tenantId],['Creado',date(user.createdAt)]].map(([label,value]) => <div key={label}>
@@ -144,7 +150,7 @@ export function UserDetail({ userId }: { userId: string }) {
           <dd>{value}</dd>
         </div>)}
       </dl>
-      <div className="notice">La API permite crear y consultar usuarios; no ofrece edición, desactivación ni cambio de contraseña.</div>
+      <div className="notice">Puedes crear, consultar y eliminar usuarios. No se ofrece edición, desactivación ni cambio de contraseña. Un administrador no puede eliminar su propia cuenta.</div>
     </section>
   </>
 }
